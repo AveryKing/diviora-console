@@ -46,6 +46,9 @@ describe('Run Scenarios (Issue #12)', () => {
 
     act(() => {
       result.current.addProposal(mockProposal);
+    });
+
+    act(() => {
       result.current.setDecision(mockDecision);
     });
     
@@ -57,12 +60,12 @@ describe('Run Scenarios (Issue #12)', () => {
     
     // Attempt 1
     act(() => {
-      result.current.generateTranscript(run.run_id, 'happy_path');
+      result.current.generateTranscript(run.run_id, 'rate_limited');
     });
 
     const t1 = result.current.state.transcripts.find(t => t.run_id === run.run_id && t.attempt === 1);
     expect(t1).toBeDefined();
-    expect(t1?.scenario_id).toBe('happy_path');
+    expect(t1?.scenario_id).toBe('rate_limited');
 
     // Attempt 2 (Rerun)
     act(() => {
@@ -82,6 +85,9 @@ describe('Run Scenarios (Issue #12)', () => {
 
     act(() => {
       result.current.addProposal(mockProposal);
+    });
+
+    act(() => {
       result.current.setDecision(mockDecision);
     });
     
@@ -105,6 +111,9 @@ describe('Run Scenarios (Issue #12)', () => {
 
     act(() => {
       result.current.addProposal(mockProposal);
+    });
+
+    act(() => {
       result.current.setDecision(mockDecision);
     });
     

@@ -52,23 +52,39 @@ export default function ArtifactDetailPage() {
   }
 
   const handleDecision = (status: 'approved' | 'rejected') => {
-    const newDecision: Decision = {
-      decision_id: `dec_${Math.random().toString(36).substr(2, 9)}`,
-      proposal_id: proposal.proposal_id,
-      status,
-      decided_at: new Date().toISOString(),
-      note: note.trim() || undefined
-    };
-    setDecision(newDecision);
-    setNote('');
+    try {
+      const newDecision: Decision = {
+        decision_id: `dec_${Math.random().toString(36).substr(2, 9)}`,
+        proposal_id: proposal.proposal_id,
+        status,
+        decided_at: new Date().toISOString(),
+        note: note.trim() || undefined
+      };
+      setDecision(newDecision);
+      setNote('');
+      setError(null);
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'name' in err && err.name === 'PolicyError') {
+        const policyErr = err as unknown as { decision: { reasons: string[]; policy_ids: string[] } };
+        setError(`Policy Violation: ${policyErr.decision.reasons.join('; ')} (${policyErr.decision.policy_ids.join(', ')})`);
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to set decision');
+      }
+    }
   };
 
   const handleCreateRun = () => {
     try {
       const newRun = createRunPlan(proposal.proposal_id);
+      setError(null);
       router.push(`/runs/${newRun.run_id}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create run plan");
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'name' in err && err.name === 'PolicyError') {
+        const policyErr = err as unknown as { decision: { reasons: string[]; policy_ids: string[] } };
+        setError(`Policy Violation: ${policyErr.decision.reasons.join('; ')} (${policyErr.decision.policy_ids.join(', ')})`);
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to create run plan");
+      }
     }
   };
 
