@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useReducer, ReactNode } from 'react';
-import { Proposal, ProposalSchema, Decision, DecisionSchema, RunPlan, RunPlanSchema, Settings, SettingsSchema } from './types';
+import { Proposal, ProposalSchema, Decision, DecisionSchema, RunPlan, RunPlanSchema, Settings, SettingsSchema, SnapshotV1, SnapshotV1Schema } from './types';
 
 type State = {
   proposals: Proposal[];
@@ -17,6 +17,7 @@ type Action =
   | { type: 'SET_DECISION'; payload: Decision }
   | { type: 'ADD_RUN'; payload: RunPlan }
   | { type: 'UPDATE_SETTINGS'; payload: Partial<Settings> }
+  | { type: 'REPLACE_STATE'; payload: State }
   | { type: 'CLEAR_ALL' };
 
 const STORAGE_KEY_PROPOSALS = 'diviora.proposals.v1';
@@ -103,6 +104,15 @@ function reducer(state: State, action: Action): State {
       return { ...state, settings: newSettings };
     }
 
+    case 'REPLACE_STATE': {
+      const { proposals, decisions, runs, settings } = action.payload;
+      localStorage.setItem(STORAGE_KEY_PROPOSALS, JSON.stringify(proposals));
+      localStorage.setItem(STORAGE_KEY_DECISIONS, JSON.stringify(decisions));
+      localStorage.setItem(STORAGE_KEY_RUNS, JSON.stringify(runs));
+      localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(settings));
+      return { ...action.payload, isLoaded: true };
+    }
+
     case 'CLEAR_ALL':
       localStorage.removeItem(STORAGE_KEY_PROPOSALS);
       localStorage.removeItem(STORAGE_KEY_DECISIONS);
@@ -123,6 +133,8 @@ const StoreContext = createContext<{
   createRunPlan: (proposal_id: string) => RunPlan;
   updateSettings: (partial: Partial<Settings>) => void;
   resetAllData: () => void;
+  exportSnapshot: () => SnapshotV1;
+  importSnapshot: (snapshot: unknown) => { ok: true } | { ok: false, error: string };
 } | undefined>(undefined);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
@@ -253,8 +265,60 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return runPlan;
   };
 
+  const exportSnapshot = (): SnapshotV1 => {
+    return {
+      snapshot_version: 1,
+      exported_at: new Date().toISOString(),
+      app_version: "0.1.0",
+      settings: state.settings,
+      proposals: state.proposals,
+      decisions: state.decisions,
+      runs: state.runs,
+    };
+  };
+
+  const importSnapshot = (payload: unknown): { ok: true } | { ok: false, error: string } => {
+    try {
+      const result = SnapshotV1Schema.safeParse(payload);
+      if (!result.success) {
+        return { ok: false, error: `Invalid snapshot schema: ${result.error.issues[0].message}` };
+      }
+
+      const snapshot = result.data;
+      const proposalIds = new Set(snapshot.proposals.map(p => p.proposal_id));
+
+      // Referential Integrity Checks
+      for (const d of snapshot.decisions) {
+        if (!proposalIds.has(d.proposal_id)) {
+          return { ok: false, error: `Referential integrity failed: Decision ${d.decision_id} refers to missing proposal ${d.proposal_id}` };
+        }
+      }
+
+      for (const r of snapshot.runs) {
+        if (!proposalIds.has(r.proposal_id)) {
+          return { ok: false, error: `Referential integrity failed: Run ${r.run_id} refers to missing proposal ${r.proposal_id}` };
+        }
+      }
+
+      dispatch({ 
+        type: 'REPLACE_STATE', 
+        payload: {
+          proposals: snapshot.proposals,
+          decisions: snapshot.decisions,
+          runs: snapshot.runs,
+          settings: snapshot.settings,
+          isLoaded: true
+        }
+      });
+
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: `Import failed: ${e instanceof Error ? e.message : 'Unknown error'}` };
+    }
+  };
+
   return (
-    <StoreContext.Provider value={{ state, addProposal, setDecision, createRunPlan, updateSettings, resetAllData }}>
+    <StoreContext.Provider value={{ state, addProposal, setDecision, createRunPlan, updateSettings, resetAllData, exportSnapshot, importSnapshot }}>
       {children}
     </StoreContext.Provider>
   );

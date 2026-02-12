@@ -1,10 +1,13 @@
 'use client';
 
 import { useStore } from "../../lib/store";
+import { useRef, useState } from "react";
 
 export default function SettingsPage() {
-  const { state, updateSettings, resetAllData } = useStore();
+  const { state, updateSettings, resetAllData, exportSnapshot, importSnapshot } = useStore();
   const { settings, isLoaded } = state;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importStatus, setImportStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   if (!isLoaded) {
     return <div className="animate-pulse flex space-y-4 flex-col">
@@ -24,12 +27,63 @@ export default function SettingsPage() {
     updateSettings({ [name]: finalValue });
   };
 
+  const handleExport = () => {
+    const snapshot = exportSnapshot();
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const date = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 16);
+    a.href = url;
+    a.download = `diviora-snapshot-${date}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportClick = () => {
+    if (confirm("Importing a snapshot will OVERWRITE all current demo data (proposals, decisions, runs, and settings). Are you sure?")) {
+      fileInputRef.current?.click();
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        const result = importSnapshot(json);
+        if (result.ok) {
+          setImportStatus({ type: 'success', message: 'Snapshot imported successfully!' });
+        } else {
+          setImportStatus({ type: 'error', message: result.error });
+        }
+      } catch {
+        setImportStatus({ type: 'error', message: 'Failed to parse JSON file.' });
+      }
+      // Reset input so the same file can be picked again
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+    reader.readAsText(file);
+  };
+
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-4xl mx-auto space-y-8 pb-20">
       <div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Settings</h2>
         <p className="text-gray-500">Configure how Diviora Console generates and displays artifacts.</p>
       </div>
+
+      {importStatus && (
+        <div className={`p-4 rounded-lg flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300 ${
+          importStatus.type === 'success' ? 'bg-green-50 border border-green-100 text-green-700' : 'bg-red-50 border border-red-100 text-red-700'
+        }`}>
+          <span>{importStatus.type === 'success' ? '✅' : '❌'}</span>
+          <p className="text-sm font-medium">{importStatus.message}</p>
+          <button onClick={() => setImportStatus(null)} className="ml-auto text-xs opacity-50 hover:opacity-100">Dismiss</button>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="p-8 space-y-8">
@@ -133,6 +187,43 @@ export default function SettingsPage() {
                   {mode.charAt(0).toUpperCase() + mode.slice(1)}
                 </button>
               ))}
+            </div>
+          </section>
+
+          <hr className="border-gray-100" />
+
+          {/* Snapshot Management */}
+          <section className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+            <div className="md:col-span-1">
+              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">State Bundles</h3>
+              <p className="text-xs text-gray-500 mt-1">Export your full history or import a shared state bundle.</p>
+            </div>
+            <div className="md:col-span-2 flex gap-4">
+              <button
+                onClick={handleExport}
+                className="flex-1 flex items-center justify-center gap-2 p-3 text-sm font-bold border border-gray-200 rounded-xl hover:bg-gray-50 transition-all active:scale-95"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Export Snapshot
+              </button>
+              <button
+                onClick={handleImportClick}
+                className="flex-1 flex items-center justify-center gap-2 p-3 text-sm font-bold border border-gray-200 rounded-xl hover:bg-gray-50 transition-all active:scale-95"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                </svg>
+                Import Snapshot
+              </button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept=".json"
+                className="hidden"
+              />
             </div>
           </section>
         </div>
