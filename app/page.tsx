@@ -2,13 +2,17 @@
 
 import { useState } from 'react';
 import { Proposal } from '../lib/types';
+import { useStore } from '../lib/store';
 
 export default function Home() {
   const [message, setMessage] = useState('');
-  const [proposal, setProposal] = useState<Proposal | null>(null);
-  const [timeline, setTimeline] = useState<{ id: string; title: string; time: string }[]>([]);
+  const { state, addProposal } = useStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // We derive Latest Proposal and Timeline from the store's state
+  const latestProposal = state.proposals[0] || null;
+  const history = state.proposals;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,15 +39,8 @@ export default function Home() {
       }
 
       const data: Proposal = await response.json();
-      setProposal(data);
-      setTimeline((prev) => [
-        {
-          id: data.proposal_id,
-          title: data.proposal.title,
-          time: new Date().toLocaleTimeString(),
-        },
-        ...prev,
-      ]);
+      addProposal(data);
+      // Clear message on success as requested (keeping preferred in prior issue, butIssue #4 scope doesn't specify, I'll keep it as is or clear it. Re-reading: "Clear textarea after successful submit OR keep it (pick one; prefer keep for now)." from Issue #3. I'll stick to keep for now unless it feels cluttered.)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -108,12 +105,12 @@ export default function Home() {
         {/* Latest Proposal View */}
         <section className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm h-full flex flex-col">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Latest Proposal</h2>
-          {proposal ? (
+          {latestProposal ? (
             <div className="flex-1 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
               <div className="border-b border-gray-100 pb-4">
-                <h3 className="text-xl font-bold text-gray-900 mb-2">{proposal.proposal.title}</h3>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">{latestProposal.proposal.title}</h3>
                 <p className="text-gray-600 leading-relaxed text-sm">
-                  {proposal.proposal.summary}
+                  {latestProposal.proposal.summary}
                 </p>
               </div>
               
@@ -121,7 +118,7 @@ export default function Home() {
                 <div>
                   <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Next Actions</h4>
                   <ul className="space-y-2">
-                    {proposal.proposal.next_actions.map((action, i) => (
+                    {latestProposal.proposal.next_actions.map((action, i) => (
                       <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
                         <span className="text-blue-500 mt-1">•</span>
                         {action}
@@ -133,7 +130,7 @@ export default function Home() {
                 <div>
                   <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 text-amber-600">Risks</h4>
                   <ul className="space-y-2">
-                    {proposal.proposal.risks.map((risk, i) => (
+                    {latestProposal.proposal.risks.map((risk, i) => (
                       <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
                         <span className="text-amber-500 mt-1">⚠️</span>
                         {risk}
@@ -144,8 +141,8 @@ export default function Home() {
               </div>
               
               <div className="pt-4 mt-auto border-t border-gray-50 flex justify-between items-center text-[10px] text-gray-400">
-                <span>Created: {new Date(proposal.created_at).toLocaleString()}</span>
-                <span className="font-mono bg-gray-50 px-2 py-0.5 rounded italic">ID: {proposal.proposal_id}</span>
+                <span>Created: {new Date(latestProposal.created_at).toLocaleString()}</span>
+                <span className="font-mono bg-gray-50 px-2 py-0.5 rounded italic">ID: {latestProposal.proposal_id}</span>
               </div>
             </div>
           ) : (
@@ -161,18 +158,18 @@ export default function Home() {
         {/* Timeline View */}
         <section className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm h-full flex flex-col">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Timeline</h2>
-          {timeline.length > 0 ? (
+          {history.length > 0 ? (
             <div className="flex-1 relative overflow-y-auto max-h-[400px] pr-2 scrollbar-thin">
               <div className="absolute left-3 top-0 bottom-0 w-px bg-gray-100"></div>
               <ul className="space-y-6 relative">
-                {timeline.map((item, i) => (
+                {history.map((item, i) => (
                   <li key={i} className="pl-8 relative group animate-in slide-in-from-left-2 duration-300">
                     <div className="absolute left-[-24px] top-1.5 w-3 h-3 rounded-full bg-blue-100 border-2 border-blue-500 group-first:bg-blue-500"></div>
                     <div>
-                      <h5 className="text-sm font-semibold text-gray-900">{item.title}</h5>
+                      <h5 className="text-sm font-semibold text-gray-900">{item.proposal.title}</h5>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-[10px] bg-gray-50 px-2 py-0.5 rounded text-gray-500 uppercase tracking-tighter">SUCCESS</span>
-                        <span className="text-[10px] text-gray-400 font-mono italic">{item.time}</span>
+                        <span className="text-[10px] text-gray-400 font-mono italic">{new Date(item.created_at).toLocaleTimeString()}</span>
                       </div>
                     </div>
                   </li>
