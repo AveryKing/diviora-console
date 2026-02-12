@@ -130,4 +130,25 @@ export const RunsCollectionSchema = z.object({
   items: z.array(RunPlanSchema),
 });
 
+export const RunTranscriptSchema = z.object({
+  transcript_id: z.string(),
+  run_id: z.string(),
+  created_at: z.string(),
+  status: z.literal('simulated'),
+  events: z.array(z.object({
+    ts: z.string(),
+    level: z.enum(['info', 'warn', 'error']),
+    step_index: z.number(),
+    message: z.string(),
+    data: z.record(z.string(), z.unknown()).optional(),
+  })),
+});
+
+export type RunTranscript = z.infer<typeof RunTranscriptSchema>;
+
+export const TranscriptsCollectionSchema = z.object({
+  schema_version: z.literal(1),
+  items: z.array(RunTranscriptSchema),
+});
+
 

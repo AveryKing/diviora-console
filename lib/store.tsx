@@ -5,12 +5,14 @@ import {
   Proposal, 
   Decision, 
   RunPlan, 
+  RunTranscript, RunTranscriptSchema,
   Settings, SettingsSchema,
   SnapshotV2, SnapshotV2Schema,
   AppMetadata, AppMetadataSchema,
   ProposalsCollectionSchema,
   DecisionsCollectionSchema,
-  RunsCollectionSchema
+  RunsCollectionSchema,
+  TranscriptsCollectionSchema
 } from './types';
 import { migrateLocalStorage, migrateSnapshot } from './migrations';
 
@@ -18,16 +20,18 @@ type State = {
   proposals: Proposal[];
   decisions: Decision[];
   runs: RunPlan[];
+  transcripts: RunTranscript[];
   settings: Settings;
   metadata: AppMetadata;
   isLoaded: boolean;
 };
 
 type Action =
-  | { type: 'HYDRATE'; proposals: Proposal[]; decisions: Decision[]; runs: RunPlan[]; settings: Settings; metadata: AppMetadata }
+  | { type: 'HYDRATE'; proposals: Proposal[]; decisions: Decision[]; runs: RunPlan[]; transcripts: RunTranscript[]; settings: Settings; metadata: AppMetadata }
   | { type: 'ADD_PROPOSAL'; payload: Proposal }
   | { type: 'SET_DECISION'; payload: Decision }
   | { type: 'ADD_RUN'; payload: RunPlan }
+  | { type: 'ADD_TRANSCRIPT'; payload: RunTranscript }
   | { type: 'UPDATE_SETTINGS'; payload: Partial<Settings> }
   | { type: 'UPDATE_METADATA'; payload: Partial<AppMetadata> }
   | { type: 'REPLACE_STATE'; payload: Omit<State, 'isLoaded'> }
@@ -36,6 +40,7 @@ type Action =
 const STORAGE_KEY_PROPOSALS = 'diviora.proposals.v1';
 const STORAGE_KEY_DECISIONS = 'diviora.decisions.v1';
 const STORAGE_KEY_RUNS = 'diviora.runs.v1';
+const STORAGE_KEY_TRANSCRIPTS = 'diviora.transcripts.v1';
 const STORAGE_KEY_SETTINGS = 'diviora.settings.v1';
 const STORAGE_KEY_METADATA = 'diviora.metadata.v1';
 
@@ -52,6 +57,7 @@ const initialState: State = {
   proposals: [],
   decisions: [],
   runs: [],
+  transcripts: [],
   settings: defaultSettings,
   metadata: {},
   isLoaded: false,
@@ -111,6 +117,19 @@ function reducer(state: State, action: Action): State {
       return { ...state, runs: newRuns };
     }
 
+    case 'ADD_TRANSCRIPT': {
+        const existingIndex = state.transcripts.findIndex(t => t.transcript_id === action.payload.transcript_id);
+        let newTranscripts;
+        if (existingIndex > -1) {
+            newTranscripts = [...state.transcripts];
+            newTranscripts[existingIndex] = action.payload;
+        } else {
+            newTranscripts = [action.payload, ...state.transcripts];
+        }
+        localStorage.setItem(STORAGE_KEY_TRANSCRIPTS, JSON.stringify({ schema_version: 1, items: newTranscripts }));
+        return { ...state, transcripts: newTranscripts };
+    }
+
     case 'UPDATE_SETTINGS': {
       const newSettings = { ...state.settings, ...action.payload };
       localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(newSettings));
@@ -124,10 +143,11 @@ function reducer(state: State, action: Action): State {
     }
 
     case 'REPLACE_STATE': {
-      const { proposals, decisions, runs, settings, metadata } = action.payload;
+      const { proposals, decisions, runs, transcripts, settings, metadata } = action.payload;
       localStorage.setItem(STORAGE_KEY_PROPOSALS, JSON.stringify({ schema_version: 1, items: proposals }));
       localStorage.setItem(STORAGE_KEY_DECISIONS, JSON.stringify({ schema_version: 1, items: decisions }));
       localStorage.setItem(STORAGE_KEY_RUNS, JSON.stringify({ schema_version: 1, items: runs }));
+      localStorage.setItem(STORAGE_KEY_TRANSCRIPTS, JSON.stringify({ schema_version: 1, items: transcripts }));
       localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(settings));
       localStorage.setItem(STORAGE_KEY_METADATA, JSON.stringify(metadata));
       return { ...action.payload, isLoaded: true };
@@ -137,10 +157,11 @@ function reducer(state: State, action: Action): State {
       localStorage.removeItem(STORAGE_KEY_PROPOSALS);
       localStorage.removeItem(STORAGE_KEY_DECISIONS);
       localStorage.removeItem(STORAGE_KEY_RUNS);
+      localStorage.removeItem(STORAGE_KEY_TRANSCRIPTS);
       localStorage.removeItem(STORAGE_KEY_SETTINGS);
       localStorage.removeItem(STORAGE_KEY_METADATA);
       localStorage.removeItem('diviora_proposals');
-      return { ...state, proposals: [], decisions: [], runs: [], settings: defaultSettings, metadata: {} };
+      return { ...state, proposals: [], decisions: [], runs: [], transcripts: [], settings: defaultSettings, metadata: {} };
     
     default:
       return state;
@@ -152,6 +173,7 @@ const StoreContext = createContext<{
   addProposal: (proposal: Proposal) => void;
   setDecision: (decision: Decision) => void;
   createRunPlan: (proposal_id: string) => RunPlan;
+  generateTranscript: (run_id: string) => RunTranscript;
   updateSettings: (partial: Partial<Settings>) => void;
   resetAllData: () => void;
   exportSnapshot: () => SnapshotV2;
@@ -168,12 +190,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const savedProposals = localStorage.getItem(STORAGE_KEY_PROPOSALS);
       const savedDecisions = localStorage.getItem(STORAGE_KEY_DECISIONS);
       const savedRuns = localStorage.getItem(STORAGE_KEY_RUNS);
+      const savedTranscripts = localStorage.getItem(STORAGE_KEY_TRANSCRIPTS);
       const savedSettings = localStorage.getItem(STORAGE_KEY_SETTINGS);
       const savedMetadata = localStorage.getItem(STORAGE_KEY_METADATA);
       
       let proposals: Proposal[] = [];
       let decisions: Decision[] = [];
       let runs: RunPlan[] = [];
+      let transcripts: RunTranscript[] = [];
       let settings: Settings = defaultSettings;
       let metadata: AppMetadata = {};
 
@@ -207,6 +231,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         } catch (e) { console.error('Failed to parse runs:', e); }
       }
 
+      if (savedTranscripts) {
+        try {
+          const parsed = JSON.parse(savedTranscripts);
+          const result = TranscriptsCollectionSchema.safeParse(parsed);
+          if (result.success) {
+            transcripts = result.data.items;
+          }
+        } catch (e) { console.error('Failed to parse transcripts:', e); }
+      }
+
       if (savedSettings) {
         try {
           const parsed = JSON.parse(savedSettings);
@@ -227,7 +261,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         } catch (e) { console.error('Failed to parse metadata:', e); }
       }
 
-      dispatch({ type: 'HYDRATE', proposals, decisions, runs, settings, metadata });
+      dispatch({ type: 'HYDRATE', proposals, decisions, runs, transcripts, settings, metadata });
     };
 
     loadData();
@@ -287,6 +321,70 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return runPlan;
   };
 
+  const generateTranscript = (run_id: string): RunTranscript => {
+    const run = state.runs.find(r => r.run_id === run_id);
+    if (!run) throw new Error("Run not found");
+
+    const existing = state.transcripts.find(t => t.run_id === run_id);
+    if (existing) return existing;
+
+    const transcriptId = `tx_${Math.random().toString(36).substr(2, 9)}`;
+    const createdAt = new Date().toISOString();
+    const baseTime = new Date(createdAt).getTime();
+
+    const events: RunTranscript['events'] = [];
+    const steps = run.plan.steps;
+    const risks = run.plan.risks;
+    const riskLevel = state.settings.risk_level;
+
+    steps.forEach((step, index) => {
+        // START
+        events.push({
+            ts: new Date(baseTime + (index * 30000)).toISOString(),
+            level: 'info',
+            step_index: index + 1,
+            message: `INIT STEP ${index + 1}: ${step.substring(0, 40)}...`,
+        });
+
+        // ACTION
+        events.push({
+            ts: new Date(baseTime + (index * 30000) + 5000).toISOString(),
+            level: 'info',
+            step_index: index + 1,
+            message: `EXECUTING: ${step}`,
+        });
+
+        // WARNING (Deterministic Risk Injection)
+        if (risks.length > 0 && (index + 1) % 2 === 0 && riskLevel !== 'low') {
+             events.push({
+                ts: new Date(baseTime + (index * 30000) + 10000).toISOString(),
+                level: 'warn',
+                step_index: index + 1,
+                message: `RISK CHECK: ${risks[index % risks.length]}`,
+            });
+        }
+
+        // RESULT
+        events.push({
+            ts: new Date(baseTime + (index * 30000) + 15000).toISOString(),
+            level: 'info',
+            step_index: index + 1,
+            message: `COMPLETE: Step ${index + 1} finalized successfully.`,
+        });
+    });
+
+    const transcript: RunTranscript = {
+        transcript_id: transcriptId,
+        run_id: run.run_id,
+        created_at: createdAt,
+        status: 'simulated',
+        events: events
+    };
+
+    dispatch({ type: 'ADD_TRANSCRIPT', payload: transcript });
+    return transcript;
+  };
+
   const exportSnapshot = (): SnapshotV2 => {
     const now = new Date().toISOString();
     dispatch({ type: 'UPDATE_METADATA', payload: { last_exported_at: now } });
@@ -343,6 +441,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           proposals: snapshot.proposals,
           decisions: snapshot.decisions,
           runs: snapshot.runs,
+          transcripts: [], // Snapshots don't have transcripts yet in V2, so empty
           settings: snapshot.settings,
           metadata: updatedMetadata
         }
@@ -355,7 +454,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <StoreContext.Provider value={{ state, addProposal, setDecision, createRunPlan, updateSettings, resetAllData, exportSnapshot, importSnapshot }}>
+    <StoreContext.Provider value={{ state, addProposal, setDecision, createRunPlan, generateTranscript, updateSettings, resetAllData, exportSnapshot, importSnapshot }}>
       {children}
     </StoreContext.Provider>
   );

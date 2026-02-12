@@ -10,10 +10,14 @@ export default function RunDetailPage() {
   const { run_id } = useParams();
   const { state } = useStore();
   const router = useRouter();
+  const [copiedTranscript, setCopiedTranscript] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // Safely find run and related data
   const run = state.runs.find(r => r.run_id === run_id);
   const proposal = run ? state.proposals.find(p => p.proposal_id === run.proposal_id) : null;
+  const transcript = run ? state.transcripts.find(t => t.run_id === run.run_id) : null;
+  const { generateTranscript } = useStore();
 
   if (!state.isLoaded) {
     return <div className="animate-pulse flex space-y-4 flex-col">
@@ -41,6 +45,17 @@ export default function RunDetailPage() {
       </div>
     );
   }
+
+  const handleGenerateTranscript = () => {
+    generateTranscript(run.run_id);
+  };
+
+  const handleCopyTranscript = () => {
+    if (!transcript) return;
+    navigator.clipboard.writeText(JSON.stringify(transcript, null, 2));
+    setCopiedTranscript(true);
+    setTimeout(() => setCopiedTranscript(false), 2000);
+  };
 
   const handleCopyJson = () => {
     navigator.clipboard.writeText(JSON.stringify(run, null, 2));
@@ -86,13 +101,29 @@ export default function RunDetailPage() {
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="p-8 border-b border-gray-100 bg-gray-50/50">
-          <div className="flex items-center gap-3 mb-4">
-            <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
-              {run.status}
-            </span>
-            <span className="text-gray-400 text-sm font-mono">
-              {run.run_id}
-            </span>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                transcript ? 'bg-green-600 text-white' : 'bg-blue-600 text-white'
+              }`}>
+                {transcript ? 'Executed' : run.status}
+              </span>
+              <span className="text-gray-400 text-sm font-mono">
+                {run.run_id}
+              </span>
+            </div>
+            {!transcript && (
+              <button
+                onClick={handleGenerateTranscript}
+                className="px-4 py-2 bg-gray-900 text-white text-sm font-bold rounded-lg hover:bg-gray-800 shadow-sm active:transform active:scale-95 transition-all flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Generate Transcript
+              </button>
+            )}
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">{run.plan.objective}</h1>
           <p className="text-gray-500 text-sm">
@@ -103,25 +134,60 @@ export default function RunDetailPage() {
           </p>
         </div>
 
-        <div className="p-8 space-y-10">
-          {/* Execution Steps */}
-          <div>
-            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-6 flex items-center gap-2">
-              <span className="w-6 h-6 bg-blue-100 text-blue-600 rounded flex items-center justify-center text-xs">01</span>
-              Execution Steps
-            </h3>
-            <div className="space-y-4 relative pl-3">
-              <div className="absolute left-0 top-0 bottom-0 w-px bg-gray-200"></div>
-              {run.plan.steps.map((step, i) => (
-                <div key={i} className="relative pl-8">
-                  <div className="absolute left-[-16.5px] top-1.5 w-2 h-2 rounded-full bg-white border-2 border-blue-600"></div>
-                  <p className="text-gray-700 text-sm leading-relaxed">{step}</p>
+        {transcript ? (
+          <div className="flex flex-col h-[600px]">
+            <div className="p-4 bg-gray-900 text-gray-400 text-xs font-mono flex items-center justify-between border-b border-gray-800">
+              <span>TRANSCRIPT_ID: {transcript.transcript_id}</span>
+              <button 
+                onClick={handleCopyTranscript}
+                className="hover:text-white transition-colors flex items-center gap-1"
+              >
+                {copiedTranscript ? 'COPIED' : 'COPY LOG'}
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto bg-gray-950 p-6 space-y-1 scrollbar-thin scrollbar-thumb-gray-800 scrollbar-track-transparent">
+              {transcript.events.map((event, i) => (
+                <div key={i} className="font-mono text-xs flex gap-4 hover:bg-white/5 p-1 rounded transition-colors group">
+                  <span className="text-gray-500 whitespace-nowrap min-w-[140px]">
+                    {new Date(event.ts).toISOString().split('T')[1].replace('Z', '')}
+                  </span>
+                  <span className={`uppercase font-bold whitespace-nowrap min-w-[60px] ${
+                    event.level === 'error' ? 'text-red-500' :
+                    event.level === 'warn' ? 'text-amber-500' :
+                    'text-blue-500'
+                  }`}>
+                    [{event.level}]
+                  </span>
+                  <span className="text-gray-300">
+                    {event.message}
+                  </span>
                 </div>
               ))}
+              <div className="pt-4 text-green-500 font-mono text-xs animate-pulse">
+                _ END OF TRANSCRIPT
+              </div>
             </div>
           </div>
+        ) : (
+          <div className="p-8 space-y-10">
+            {/* Execution Steps */}
+            <div>
+              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-6 flex items-center gap-2">
+                <span className="w-6 h-6 bg-blue-100 text-blue-600 rounded flex items-center justify-center text-xs">01</span>
+                Execution Steps
+              </h3>
+              <div className="space-y-4 relative pl-3">
+                <div className="absolute left-0 top-0 bottom-0 w-px bg-gray-200"></div>
+                {run.plan.steps.map((step, i) => (
+                  <div key={i} className="relative pl-8">
+                    <div className="absolute left-[-16.5px] top-1.5 w-2 h-2 rounded-full bg-white border-2 border-blue-600"></div>
+                    <p className="text-gray-700 text-sm leading-relaxed">{step}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             {/* Inputs & Outputs */}
             <div className="space-y-8">
               <div>
@@ -174,11 +240,12 @@ export default function RunDetailPage() {
               </div>
             </div>
           </div>
-        </div>
+          </div>
+        )}
 
         <div className="p-8 bg-gray-50 border-t border-gray-100 flex justify-between items-center text-xs text-gray-400">
           <span>Created: {new Date(run.created_at).toLocaleString()}</span>
-          <span>Status: DETERMINISTIC PLAN</span>
+          <span>Status: {transcript ? 'SIMULATION COMPLETE' : 'DETERMINISTIC PLAN'}</span>
         </div>
       </div>
     </div>
