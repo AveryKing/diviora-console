@@ -12,6 +12,7 @@ export default function Home() {
 
   // We derive Latest Proposal and Timeline from the store's state
   const latestProposal = state.proposals[0] || null;
+  const latestDecision = latestProposal ? state.decisions.find(d => d.proposal_id === latestProposal.proposal_id) : null;
   const history = state.proposals;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -108,7 +109,16 @@ export default function Home() {
           {latestProposal ? (
             <div className="flex-1 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
               <div className="border-b border-gray-100 pb-4">
-                <h3 className="text-xl font-bold text-gray-900 mb-2">{latestProposal.proposal.title}</h3>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-xl font-bold text-gray-900">{latestProposal.proposal.title}</h3>
+                  {latestDecision && (
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                      latestDecision.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                    }`}>
+                      {latestDecision.status}
+                    </span>
+                  )}
+                </div>
                 <p className="text-gray-600 leading-relaxed text-sm">
                   {latestProposal.proposal.summary}
                 </p>

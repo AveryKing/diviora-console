@@ -21,3 +21,14 @@ export const CompileRequestSchema = z.object({
 });
 
 export type CompileRequest = z.infer<typeof CompileRequestSchema>;
+
+export const DecisionSchema = z.object({
+  decision_id: z.string(),
+  proposal_id: z.string(),
+  status: z.enum(['approved', 'rejected']),
+  decided_at: z.string(),
+  note: z.string().optional(),
+});
+
+export type Decision = z.infer<typeof DecisionSchema>;
+
