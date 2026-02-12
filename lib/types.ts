@@ -76,4 +76,46 @@ export const SnapshotV1Schema = z.object({
 
 export type SnapshotV1 = z.infer<typeof SnapshotV1Schema>;
 
+export const AppMetadataSchema = z.object({
+  last_exported_at: z.string().optional(),
+  last_imported_at: z.string().optional(),
+  last_imported_version: z.number().optional(),
+});
+
+export type AppMetadata = z.infer<typeof AppMetadataSchema>;
+
+export const SnapshotV2Schema = z.object({
+  snapshot_version: z.literal(2),
+  exported_at: z.string(),
+  app_version: z.string(),
+  state_schema_versions: z.object({
+    settings: z.number(),
+    proposals: z.number(),
+    decisions: z.number(),
+    runs: z.number(),
+  }),
+  settings: SettingsSchema,
+  proposals: z.array(ProposalSchema),
+  decisions: z.array(DecisionSchema),
+  runs: z.array(RunPlanSchema),
+});
+
+export type SnapshotV2 = z.infer<typeof SnapshotV2Schema>;
+
+// Storage wrappers for versioning
+export const ProposalsCollectionSchema = z.object({
+  schema_version: z.literal(1),
+  items: z.array(ProposalSchema),
+});
+
+export const DecisionsCollectionSchema = z.object({
+  schema_version: z.literal(1),
+  items: z.array(DecisionSchema),
+});
+
+export const RunsCollectionSchema = z.object({
+  schema_version: z.literal(1),
+  items: z.array(RunPlanSchema),
+});
+
 
