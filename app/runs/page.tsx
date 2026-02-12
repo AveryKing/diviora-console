@@ -71,9 +71,15 @@ export default function RunsPage() {
                       {new Date(run.created_at).toLocaleString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-1 text-[10px] font-bold uppercase rounded bg-blue-50 text-blue-600 tracking-wider">
-                        {run.status}
-                      </span>
+                      {state.transcripts.find(t => t.run_id === run.run_id) ? (
+                        <span className="px-2 py-1 text-[10px] font-bold uppercase rounded bg-green-50 text-green-600 tracking-wider">
+                          Executed
+                        </span>
+                      ) : (
+                        <span className="px-2 py-1 text-[10px] font-bold uppercase rounded bg-blue-50 text-blue-600 tracking-wider">
+                          {run.status}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <Link href={`/runs/${run.run_id}`} className="text-blue-600 hover:text-blue-900 group flex items-center justify-end gap-1">
