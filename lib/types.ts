@@ -18,6 +18,11 @@ export type Proposal = z.infer<typeof ProposalSchema>;
 
 export const CompileRequestSchema = z.object({
   message: z.string().min(1, "Message cannot be empty"),
+  settings: z.object({
+    proposal_style: z.enum(['concise', 'detailed']),
+    risk_level: z.enum(['low', 'medium', 'high']),
+    default_step_count: z.union([z.literal(3), z.literal(5), z.literal(7)]),
+  }).optional(),
 });
 
 export type CompileRequest = z.infer<typeof CompileRequestSchema>;
@@ -48,5 +53,15 @@ export const RunPlanSchema = z.object({
 });
 
 export type RunPlan = z.infer<typeof RunPlanSchema>;
+
+export const SettingsSchema = z.object({
+  schema_version: z.literal(1),
+  proposal_style: z.enum(['concise', 'detailed']),
+  risk_level: z.enum(['low', 'medium', 'high']),
+  default_step_count: z.union([z.literal(3), z.literal(5), z.literal(7)]),
+  timeline_mode: z.enum(['compact', 'expanded']),
+});
+
+export type Settings = z.infer<typeof SettingsSchema>;
 
 
