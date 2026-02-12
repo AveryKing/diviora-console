@@ -1,7 +1,7 @@
 'use client';
 
 import EmptyState from "../components/EmptyState";
-import { useStore } from "@/lib/store";
+import { useStore } from "../../lib/store";
 import Link from "next/link";
 
 export default function ArtifactsPage() {

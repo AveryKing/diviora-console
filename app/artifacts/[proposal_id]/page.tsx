@@ -1,18 +1,21 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useStore } from '@/lib/store';
-import EmptyState from '@/app/components/EmptyState';
+import { useStore } from '../../../lib/store';
+import EmptyState from '../../components/EmptyState';
 import Link from 'next/link';
 import { useState } from 'react';
+import { Decision } from '../../../lib/types';
 
 export default function ArtifactDetailPage() {
   const { proposal_id } = useParams();
-  const { state } = useStore();
+  const { state, setDecision } = useStore();
   const router = useRouter();
   const [copied, setCopied] = useState(false);
+  const [note, setNote] = useState('');
 
   const proposal = state.proposals.find(p => p.proposal_id === proposal_id);
+  const decision = state.decisions.find(d => d.proposal_id === proposal_id);
 
   if (!state.isLoaded) {
     return <div className="animate-pulse flex space-y-4 flex-col">
@@ -45,6 +48,18 @@ export default function ArtifactDetailPage() {
       </div>
     );
   }
+
+  const handleDecision = (status: 'approved' | 'rejected') => {
+    const newDecision: Decision = {
+      decision_id: `dec_${Math.random().toString(36).substr(2, 9)}`,
+      proposal_id: proposal.proposal_id,
+      status,
+      decided_at: new Date().toISOString(),
+      note: note.trim() || undefined
+    };
+    setDecision(newDecision);
+    setNote('');
+  };
 
   const handleCopyJson = () => {
     navigator.clipboard.writeText(JSON.stringify(proposal, null, 2));
@@ -79,7 +94,7 @@ export default function ArtifactDetailPage() {
             ) : (
               <>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
                 </svg>
                 Copy JSON
               </>
@@ -90,13 +105,25 @@ export default function ArtifactDetailPage() {
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="p-8 border-b border-gray-100">
-          <div className="flex items-center gap-3 mb-4">
-            <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
-              Draft Proposal
-            </span>
-            <span className="text-gray-400 text-sm font-mono">
-              {proposal.proposal_id}
-            </span>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+                Draft Proposal
+              </span>
+              <span className="text-gray-400 text-sm font-mono">
+                {proposal.proposal_id}
+              </span>
+            </div>
+            {decision && (
+              <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                decision.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+              }`}>
+                {decision.status === 'approved' ? '✓' : '✗'} {decision.status}
+                <span className="text-[10px] opacity-60 ml-2 normal-case font-medium">
+                  {new Date(decision.decided_at).toLocaleString()}
+                </span>
+              </div>
+            )}
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-4">{proposal.proposal.title}</h1>
           <p className="text-gray-600 text-lg leading-relaxed">{proposal.proposal.summary}</p>
@@ -126,6 +153,49 @@ export default function ArtifactDetailPage() {
                 </li>
               ))}
             </ul>
+          </div>
+        </div>
+
+        <div className="p-8 border-b border-gray-100 bg-gray-50/50">
+          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-6">Make a Decision</h3>
+          <div className="max-w-xl">
+            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Note (Optional)</label>
+            <textarea
+              className="w-full p-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all mb-4"
+              rows={3}
+              placeholder="Add reasoning for your decision..."
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+            {decision?.note && (
+              <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100 text-sm text-blue-800 italic">
+                Latest note: &quot;{decision.note}&quot;
+              </div>
+            )}
+            <div className="flex gap-4">
+              <button
+                onClick={() => handleDecision('approved')}
+                disabled={decision?.status === 'approved'}
+                className={`flex-1 py-3 px-6 rounded-lg font-bold text-white transition-all shadow-md active:transform active:scale-95 ${
+                  decision?.status === 'approved' 
+                    ? 'bg-gray-300 cursor-not-allowed shadow-none' 
+                    : 'bg-green-600 hover:bg-green-700 hover:shadow-lg'
+                }`}
+              >
+                Approve
+              </button>
+              <button
+                onClick={() => handleDecision('rejected')}
+                disabled={decision?.status === 'rejected'}
+                className={`flex-1 py-3 px-6 rounded-lg font-bold text-white transition-all shadow-md active:transform active:scale-95 ${
+                  decision?.status === 'rejected' 
+                    ? 'bg-gray-300 cursor-not-allowed shadow-none' 
+                    : 'bg-red-600 hover:bg-red-700 hover:shadow-lg'
+                }`}
+              >
+                Reject
+              </button>
+            </div>
           </div>
         </div>
 

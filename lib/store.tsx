@@ -1,29 +1,39 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useReducer, ReactNode } from 'react';
-import { Proposal, ProposalSchema } from './types';
+import { Proposal, ProposalSchema, Decision, DecisionSchema } from './types';
 
 type State = {
   proposals: Proposal[];
+  decisions: Decision[];
   isLoaded: boolean;
 };
 
 type Action =
-  | { type: 'SET_PROPOSALS'; payload: Proposal[] }
+  | { type: 'HYDRATE'; proposals: Proposal[]; decisions: Decision[] }
   | { type: 'ADD_PROPOSAL'; payload: Proposal }
-  | { type: 'CLEAR_PROPOSALS' };
+  | { type: 'SET_DECISION'; payload: Decision }
+  | { type: 'CLEAR_ALL' };
 
-const STORAGE_KEY = 'diviora_proposals';
+const STORAGE_KEY_PROPOSALS = 'diviora.proposals.v1';
+const STORAGE_KEY_DECISIONS = 'diviora.decisions.v1';
 
 const initialState: State = {
   proposals: [],
+  decisions: [],
   isLoaded: false,
 };
 
-function proposalReducer(state: State, action: Action): State {
+function reducer(state: State, action: Action): State {
   switch (action.type) {
-    case 'SET_PROPOSALS':
-      return { ...state, proposals: action.payload, isLoaded: true };
+    case 'HYDRATE':
+      return { 
+        ...state, 
+        proposals: action.proposals, 
+        decisions: action.decisions, 
+        isLoaded: true 
+      };
+    
     case 'ADD_PROPOSAL': {
       const existingIndex = state.proposals.findIndex(p => p.proposal_id === action.payload.proposal_id);
       let newProposals;
@@ -33,15 +43,32 @@ function proposalReducer(state: State, action: Action): State {
       } else {
         newProposals = [action.payload, ...state.proposals];
       }
-      // Keep sorted by newest first
       newProposals.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newProposals));
+      localStorage.setItem(STORAGE_KEY_PROPOSALS, JSON.stringify(newProposals));
       return { ...state, proposals: newProposals };
     }
-    case 'CLEAR_PROPOSALS':
-      localStorage.removeItem(STORAGE_KEY);
-      return { ...state, proposals: [] };
+
+    case 'SET_DECISION': {
+      const existingIndex = state.decisions.findIndex(d => d.proposal_id === action.payload.proposal_id);
+      let newDecisions;
+      if (existingIndex > -1) {
+        newDecisions = [...state.decisions];
+        newDecisions[existingIndex] = action.payload;
+      } else {
+        newDecisions = [action.payload, ...state.decisions];
+      }
+      newDecisions.sort((a, b) => new Date(b.decided_at).getTime() - new Date(a.decided_at).getTime());
+      
+      localStorage.setItem(STORAGE_KEY_DECISIONS, JSON.stringify(newDecisions));
+      return { ...state, decisions: newDecisions };
+    }
+
+    case 'CLEAR_ALL':
+      localStorage.removeItem(STORAGE_KEY_PROPOSALS);
+      localStorage.removeItem(STORAGE_KEY_DECISIONS);
+      return { ...state, proposals: [], decisions: [] };
+    
     default:
       return state;
   }
@@ -50,49 +77,66 @@ function proposalReducer(state: State, action: Action): State {
 const StoreContext = createContext<{
   state: State;
   addProposal: (proposal: Proposal) => void;
-  clearProposals: () => void;
+  setDecision: (decision: Decision) => void;
+  clearAll: () => void;
 } | undefined>(undefined);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(proposalReducer, initialState);
+  const [state, dispatch] = useReducer(reducer, initialState);
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          // Validate each proposal, filter out invalid ones
-          const validProposals = parsed
-            .map(p => {
-              const result = ProposalSchema.safeParse(p);
-              return result.success ? result.data : null;
-            })
-            .filter((p): p is Proposal => p !== null);
-          
-          dispatch({ type: 'SET_PROPOSALS', payload: validProposals });
-        } else {
-          dispatch({ type: 'SET_PROPOSALS', payload: [] });
+    const loadData = () => {
+      // Handle legacy key migration or just start fresh with new keys
+      const savedProposals = localStorage.getItem(STORAGE_KEY_PROPOSALS) || localStorage.getItem('diviora_proposals');
+      const savedDecisions = localStorage.getItem(STORAGE_KEY_DECISIONS);
+      
+      let proposals: Proposal[] = [];
+      let decisions: Decision[] = [];
+
+      if (savedProposals) {
+        try {
+          const parsed = JSON.parse(savedProposals);
+          if (Array.isArray(parsed)) {
+            proposals = parsed
+              .map(p => {
+                const result = ProposalSchema.safeParse(p);
+                return result.success ? result.data : null;
+              })
+              .filter((p): p is Proposal => p !== null);
+          }
+        } catch (e) {
+          console.error('Failed to parse proposals:', e);
         }
-      } catch (e) {
-        console.error('Failed to load proposals from localStorage:', e);
-        dispatch({ type: 'SET_PROPOSALS', payload: [] });
       }
-    } else {
-      dispatch({ type: 'SET_PROPOSALS', payload: [] });
-    }
+
+      if (savedDecisions) {
+        try {
+          const parsed = JSON.parse(savedDecisions);
+          if (Array.isArray(parsed)) {
+            decisions = parsed
+              .map(d => {
+                const result = DecisionSchema.safeParse(d);
+                return result.success ? result.data : null;
+              })
+              .filter((d): d is Decision => d !== null);
+          }
+        } catch (e) {
+          console.error('Failed to parse decisions:', e);
+        }
+      }
+
+      dispatch({ type: 'HYDRATE', proposals, decisions });
+    };
+
+    loadData();
   }, []);
 
-  const addProposal = (proposal: Proposal) => {
-    dispatch({ type: 'ADD_PROPOSAL', payload: proposal });
-  };
-
-  const clearProposals = () => {
-    dispatch({ type: 'CLEAR_PROPOSALS' });
-  };
+  const addProposal = (payload: Proposal) => dispatch({ type: 'ADD_PROPOSAL', payload });
+  const setDecision = (payload: Decision) => dispatch({ type: 'SET_DECISION', payload });
+  const clearAll = () => dispatch({ type: 'CLEAR_ALL' });
 
   return (
-    <StoreContext.Provider value={{ state, addProposal, clearProposals }}>
+    <StoreContext.Provider value={{ state, addProposal, setDecision, clearAll }}>
       {children}
     </StoreContext.Provider>
   );
