@@ -8,6 +8,7 @@ describe('Settings Logic (Issue #7)', () => {
     risk_level: 'medium',
     default_step_count: 5,
     timeline_mode: 'expanded',
+    template_id: 'generic',
   };
 
   it('validates settings with Zod', () => {

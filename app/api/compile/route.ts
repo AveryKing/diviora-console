@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
-import { Proposal, CompileRequestSchema } from '../../../lib/types';
+import { Proposal, CompileRequestSchema, Settings } from '../../../lib/types';
+import { generateProposalSections, TemplateId } from '../../../lib/templates';
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,39 +22,59 @@ export async function POST(request: NextRequest) {
     const proposalStyle = settings?.proposal_style || 'detailed';
     const riskLevel = settings?.risk_level || 'medium';
     const stepCount = settings?.default_step_count || 5;
+    const templateId = (settings?.template_id as TemplateId) || 'generic';
 
-    // Generate stable ID based on message content
-    const hash = createHash('sha256').update(message).digest('hex').substring(0, 12);
+    // Construct full settings object for the helper
+    const fullSettings: Settings = {
+      schema_version: 1,
+      proposal_style: proposalStyle,
+      risk_level: riskLevel,
+      default_step_count: stepCount,
+      timeline_mode: 'expanded', // Not used in generation
+      template_id: templateId,
+    };
+
+    // Generate stable ID based on message AND template
+    const hashInput = `${message}-${templateId}-${stepCount}-${riskLevel}-${proposalStyle}`;
+    const hash = createHash('sha256').update(hashInput).digest('hex').substring(0, 12);
     const proposalId = `prop_${hash}`;
 
-    // Deterministic summary length based on style
-    const baseSummary = `This is a generated summary for the requested message. It addresses the core intent: "${message}".`;
-    const summary = proposalStyle === 'concise' 
-      ? `Brief: ${message.substring(0, 100)}`
-      : `${baseSummary} It has been analyzed with a focus on ${riskLevel} risk factors and satisfies the requirement for a ${proposalStyle} breakdown.`;
+    // Generate sections using the template engine
+    const sections = generateProposalSections(templateId, message, fullSettings);
 
-    // Deterministic actions based on step count
-    const actions = Array.from({ length: stepCount }, (_, i) => `Step ${i + 1}: ${message.substring(0, 20)}... action`);
+    // Map sections to legacy fields for compatibility
+    const title = `Proposal: ${message.substring(0, 30)}${message.length > 30 ? '...' : ''}`;
+    
+    let summary = sections[0].content;
+    if (Array.isArray(summary)) summary = summary.join(" ");
 
-    // Deterministic risks based on risk level
-    const baseRisks = ["Dependency on external Hub availability"];
-    const risks = [...baseRisks];
-    if (riskLevel === 'high') {
-      risks.push("Critical path implementation risk", "Resource contention expected");
-    } else if (riskLevel === 'medium') {
-      risks.push("Potential for minor requirement drift");
-    }
+    const nextActionsSection = sections.find(s => 
+      s.key === 'next_actions' || 
+      s.key === 'sequence' || 
+      s.key === 'repro_steps' || 
+      s.key === 'milestones'
+    );
+    const nextActions = Array.isArray(nextActionsSection?.content) 
+      ? nextActionsSection.content 
+      : ["See detailed sections for steps."];
 
-    // Create deterministic stub proposal
+    const risksSection = sections.find(s => s.key === 'risks');
+    const risks = Array.isArray(risksSection?.content) 
+      ? risksSection.content 
+      : ["General operational risk"];
+
+    // Create deterministic proposal with both legacy and new structure
     const proposal: Proposal = {
       proposal_id: proposalId,
       created_at: new Date().toISOString(),
       input: { message },
       proposal: {
-        title: `Proposal: ${message.substring(0, 30)}${message.length > 30 ? '...' : ''}`,
-        summary,
-        next_actions: actions,
-        risks,
+        title,
+        summary: typeof summary === 'string' ? summary : String(summary),
+        next_actions: nextActions,
+        risks: risks,
+        template_id: templateId,
+        sections: sections,
       }
     };
 

@@ -197,6 +197,11 @@ export default function Home() {
                         </div>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-[10px] bg-gray-50 px-2 py-0.5 rounded text-gray-500 uppercase tracking-tighter">SUCCESS</span>
+                          {timelineMode === 'expanded' && item.proposal.template_id && (
+                             <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded uppercase tracking-tighter font-bold">
+                               {item.proposal.template_id.replace('_', ' ')}
+                             </span>
+                          )}
                           <span className="text-[10px] text-gray-400 font-mono italic">{new Date(item.created_at).toLocaleTimeString()}</span>
                           {timelineMode === 'expanded' && (
                             <span className="text-[8px] text-gray-300 font-mono">ID: {item.proposal_id.substring(0, 8)}</span>

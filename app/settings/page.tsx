@@ -87,6 +87,35 @@ export default function SettingsPage() {
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="p-8 space-y-8">
+          {/* Template Selection */}
+          <section className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+            <div className="md:col-span-1">
+              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Output Template</h3>
+              <p className="text-xs text-gray-500 mt-1">Select the structural template for new proposals.</p>
+            </div>
+            <div className="md:col-span-2 space-y-3">
+              <select
+                name="template_id"
+                value={settings.template_id || 'generic'}
+                onChange={handleChange}
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              >
+                <option value="generic">Generic Proposal</option>
+                <option value="sales_outreach">Sales Outreach</option>
+                <option value="bug_triage">Bug Triage</option>
+                <option value="project_plan">Project Plan</option>
+              </select>
+              <p className="text-xs text-blue-600">
+                {settings.template_id === 'sales_outreach' && 'Optimized for ICP, Offer, and Sequence.'}
+                {settings.template_id === 'bug_triage' && 'Optimized for Repro, Expected vs Actual, and Fix Plan.'}
+                {settings.template_id === 'project_plan' && 'Optimized for Goals, Milestones, and Dependencies.'}
+                {(settings.template_id === 'generic' || !settings.template_id) && 'Standard Summary, Actions, and Risk format.'}
+              </p>
+            </div>
+          </section>
+
+          <hr className="border-gray-100" />
+
           {/* Proposal Generation Style */}
           <section className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
             <div className="md:col-span-1">

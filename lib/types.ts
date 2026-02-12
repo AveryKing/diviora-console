@@ -1,5 +1,13 @@
 import { z } from 'zod';
 
+export const ProposalSectionSchema = z.object({
+  key: z.string(),
+  title: z.string(),
+  content: z.union([z.string(), z.array(z.string())]),
+});
+
+export type ProposalSection = z.infer<typeof ProposalSectionSchema>;
+
 export const ProposalSchema = z.object({
   proposal_id: z.string(),
   created_at: z.string(),
@@ -11,6 +19,8 @@ export const ProposalSchema = z.object({
     summary: z.string(),
     next_actions: z.array(z.string()),
     risks: z.array(z.string()),
+    template_id: z.string().optional(),
+    sections: z.array(ProposalSectionSchema).optional(),
   }),
 });
 
@@ -22,6 +32,7 @@ export const CompileRequestSchema = z.object({
     proposal_style: z.enum(['concise', 'detailed']),
     risk_level: z.enum(['low', 'medium', 'high']),
     default_step_count: z.union([z.literal(3), z.literal(5), z.literal(7)]),
+    template_id: z.enum(['generic', 'sales_outreach', 'bug_triage', 'project_plan']).optional(),
   }).optional(),
 });
 
@@ -60,6 +71,7 @@ export const SettingsSchema = z.object({
   risk_level: z.enum(['low', 'medium', 'high']),
   default_step_count: z.union([z.literal(3), z.literal(5), z.literal(7)]),
   timeline_mode: z.enum(['compact', 'expanded']),
+  template_id: z.enum(['generic', 'sales_outreach', 'bug_triage', 'project_plan']).default('generic'),
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;
