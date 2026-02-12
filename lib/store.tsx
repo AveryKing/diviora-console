@@ -1,26 +1,30 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useReducer, ReactNode } from 'react';
-import { Proposal, ProposalSchema, Decision, DecisionSchema } from './types';
+import { Proposal, ProposalSchema, Decision, DecisionSchema, RunPlan, RunPlanSchema } from './types';
 
 type State = {
   proposals: Proposal[];
   decisions: Decision[];
+  runs: RunPlan[];
   isLoaded: boolean;
 };
 
 type Action =
-  | { type: 'HYDRATE'; proposals: Proposal[]; decisions: Decision[] }
+  | { type: 'HYDRATE'; proposals: Proposal[]; decisions: Decision[]; runs: RunPlan[] }
   | { type: 'ADD_PROPOSAL'; payload: Proposal }
   | { type: 'SET_DECISION'; payload: Decision }
+  | { type: 'ADD_RUN'; payload: RunPlan }
   | { type: 'CLEAR_ALL' };
 
 const STORAGE_KEY_PROPOSALS = 'diviora.proposals.v1';
 const STORAGE_KEY_DECISIONS = 'diviora.decisions.v1';
+const STORAGE_KEY_RUNS = 'diviora.runs.v1';
 
 const initialState: State = {
   proposals: [],
   decisions: [],
+  runs: [],
   isLoaded: false,
 };
 
@@ -31,6 +35,7 @@ function reducer(state: State, action: Action): State {
         ...state, 
         proposals: action.proposals, 
         decisions: action.decisions, 
+        runs: action.runs,
         isLoaded: true 
       };
     
@@ -64,10 +69,26 @@ function reducer(state: State, action: Action): State {
       return { ...state, decisions: newDecisions };
     }
 
+    case 'ADD_RUN': {
+      const existingIndex = state.runs.findIndex(r => r.proposal_id === action.payload.proposal_id);
+      let newRuns;
+      if (existingIndex > -1) {
+        newRuns = [...state.runs];
+        newRuns[existingIndex] = action.payload;
+      } else {
+        newRuns = [action.payload, ...state.runs];
+      }
+      newRuns.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      localStorage.setItem(STORAGE_KEY_RUNS, JSON.stringify(newRuns));
+      return { ...state, runs: newRuns };
+    }
+
     case 'CLEAR_ALL':
       localStorage.removeItem(STORAGE_KEY_PROPOSALS);
       localStorage.removeItem(STORAGE_KEY_DECISIONS);
-      return { ...state, proposals: [], decisions: [] };
+      localStorage.removeItem(STORAGE_KEY_RUNS);
+      return { ...state, proposals: [], decisions: [], runs: [] };
     
     default:
       return state;
@@ -78,6 +99,7 @@ const StoreContext = createContext<{
   state: State;
   addProposal: (proposal: Proposal) => void;
   setDecision: (decision: Decision) => void;
+  createRunPlan: (proposal_id: string) => RunPlan;
   clearAll: () => void;
 } | undefined>(undefined);
 
@@ -86,12 +108,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const loadData = () => {
-      // Handle legacy key migration or just start fresh with new keys
       const savedProposals = localStorage.getItem(STORAGE_KEY_PROPOSALS) || localStorage.getItem('diviora_proposals');
       const savedDecisions = localStorage.getItem(STORAGE_KEY_DECISIONS);
+      const savedRuns = localStorage.getItem(STORAGE_KEY_RUNS);
       
       let proposals: Proposal[] = [];
       let decisions: Decision[] = [];
+      let runs: RunPlan[] = [];
 
       if (savedProposals) {
         try {
@@ -104,9 +127,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               })
               .filter((p): p is Proposal => p !== null);
           }
-        } catch (e) {
-          console.error('Failed to parse proposals:', e);
-        }
+        } catch (e) { console.error('Failed to parse proposals:', e); }
       }
 
       if (savedDecisions) {
@@ -120,12 +141,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               })
               .filter((d): d is Decision => d !== null);
           }
-        } catch (e) {
-          console.error('Failed to parse decisions:', e);
-        }
+        } catch (e) { console.error('Failed to parse decisions:', e); }
       }
 
-      dispatch({ type: 'HYDRATE', proposals, decisions });
+      if (savedRuns) {
+        try {
+          const parsed = JSON.parse(savedRuns);
+          if (Array.isArray(parsed)) {
+            runs = parsed
+              .map(r => {
+                const result = RunPlanSchema.safeParse(r);
+                return result.success ? result.data : null;
+              })
+              .filter((r): r is RunPlan => r !== null);
+          }
+        } catch (e) { console.error('Failed to parse runs:', e); }
+      }
+
+      dispatch({ type: 'HYDRATE', proposals, decisions, runs });
     };
 
     loadData();
@@ -133,10 +166,41 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const addProposal = (payload: Proposal) => dispatch({ type: 'ADD_PROPOSAL', payload });
   const setDecision = (payload: Decision) => dispatch({ type: 'SET_DECISION', payload });
+  
+  const createRunPlan = (proposal_id: string): RunPlan => {
+    const proposal = state.proposals.find(p => p.proposal_id === proposal_id);
+    const decision = state.decisions.find(d => d.proposal_id === proposal_id);
+
+    if (!proposal) throw new Error("Proposal not found");
+    if (!decision || decision.status !== 'approved') {
+      throw new Error("Cannot create run plan for unapproved proposal");
+    }
+
+    const runPlan: RunPlan = {
+      run_id: `run_${Math.random().toString(36).substr(2, 9)}`,
+      proposal_id: proposal.proposal_id,
+      created_at: new Date().toISOString(),
+      status: 'planned',
+      plan: {
+        objective: proposal.proposal.title,
+        steps: proposal.proposal.next_actions.length > 0 
+          ? proposal.proposal.next_actions 
+          : ["Execute proposal objective"],
+        inputs_needed: ["Operator approval status"],
+        expected_outputs: ["System state reflecting proposal updates"],
+        risks: proposal.proposal.risks,
+        rollback: ["Revert state change via manual override"]
+      }
+    };
+
+    dispatch({ type: 'ADD_RUN', payload: runPlan });
+    return runPlan;
+  };
+
   const clearAll = () => dispatch({ type: 'CLEAR_ALL' });
 
   return (
-    <StoreContext.Provider value={{ state, addProposal, setDecision, clearAll }}>
+    <StoreContext.Provider value={{ state, addProposal, setDecision, createRunPlan, clearAll }}>
       {children}
     </StoreContext.Provider>
   );

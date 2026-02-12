@@ -9,13 +9,15 @@ import { Decision } from '../../../lib/types';
 
 export default function ArtifactDetailPage() {
   const { proposal_id } = useParams();
-  const { state, setDecision } = useStore();
+  const { state, setDecision, createRunPlan } = useStore();
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [note, setNote] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const proposal = state.proposals.find(p => p.proposal_id === proposal_id);
   const decision = state.decisions.find(d => d.proposal_id === proposal_id);
+  const run = state.runs.find(r => r.proposal_id === proposal_id);
 
   if (!state.isLoaded) {
     return <div className="animate-pulse flex space-y-4 flex-col">
@@ -61,6 +63,15 @@ export default function ArtifactDetailPage() {
     setNote('');
   };
 
+  const handleCreateRun = () => {
+    try {
+      const newRun = createRunPlan(proposal.proposal_id);
+      router.push(`/runs/${newRun.run_id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create run plan");
+    }
+  };
+
   const handleCopyJson = () => {
     navigator.clipboard.writeText(JSON.stringify(proposal, null, 2));
     setCopied(true);
@@ -80,6 +91,33 @@ export default function ArtifactDetailPage() {
           Back to Artifacts
         </button>
         <div className="flex gap-2">
+          {run ? (
+            <Link 
+              href={`/runs/${run.run_id}`}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-lg hover:bg-blue-100 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              View Run Plan
+            </Link>
+          ) : (
+            <button
+              onClick={handleCreateRun}
+              disabled={decision?.status !== 'approved'}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all ${
+                decision?.status === 'approved' 
+                  ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm' 
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              }`}
+              title={decision?.status !== 'approved' ? 'Requires approval' : 'Generate execution plan'}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Create Run Plan
+            </button>
+          )}
           <button
             onClick={handleCopyJson}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -102,6 +140,15 @@ export default function ArtifactDetailPage() {
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-100 rounded-lg text-red-700 text-sm flex items-center gap-2">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          {error}
+        </div>
+      )}
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="p-8 border-b border-gray-100">
