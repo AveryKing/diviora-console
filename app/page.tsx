@@ -14,6 +14,7 @@ export default function Home() {
   const latestProposal = state.proposals[0] || null;
   const latestDecision = latestProposal ? state.decisions.find(d => d.proposal_id === latestProposal.proposal_id) : null;
   const history = state.proposals;
+  const timelineMode = state.settings.timeline_mode;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,7 +32,14 @@ export default function Home() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message }),
+        body: JSON.stringify({ 
+          message,
+          settings: {
+            proposal_style: state.settings.proposal_style,
+            risk_level: state.settings.risk_level,
+            default_step_count: state.settings.default_step_count,
+          }
+        }),
       });
 
       if (!response.ok) {
@@ -41,7 +49,6 @@ export default function Home() {
 
       const data: Proposal = await response.json();
       addProposal(data);
-      // Clear message on success as requested (keeping preferred in prior issue, butIssue #4 scope doesn't specify, I'll keep it as is or clear it. Re-reading: "Clear textarea after successful submit OR keep it (pick one; prefer keep for now)." from Issue #3. I'll stick to keep for now unless it feels cluttered.)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -172,18 +179,33 @@ export default function Home() {
             <div className="flex-1 relative overflow-y-auto max-h-[400px] pr-2 scrollbar-thin">
               <div className="absolute left-3 top-0 bottom-0 w-px bg-gray-100"></div>
               <ul className="space-y-6 relative">
-                {history.map((item, i) => (
-                  <li key={i} className="pl-8 relative group animate-in slide-in-from-left-2 duration-300">
-                    <div className="absolute left-[-24px] top-1.5 w-3 h-3 rounded-full bg-blue-100 border-2 border-blue-500 group-first:bg-blue-500"></div>
-                    <div>
-                      <h5 className="text-sm font-semibold text-gray-900">{item.proposal.title}</h5>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] bg-gray-50 px-2 py-0.5 rounded text-gray-500 uppercase tracking-tighter">SUCCESS</span>
-                        <span className="text-[10px] text-gray-400 font-mono italic">{new Date(item.created_at).toLocaleTimeString()}</span>
+                {history.map((item, i) => {
+                  const itemDecision = state.decisions.find(d => d.proposal_id === item.proposal_id);
+                  return (
+                    <li key={i} className="pl-8 relative group animate-in slide-in-from-left-2 duration-300">
+                      <div className="absolute left-[-24px] top-1.5 w-3 h-3 rounded-full bg-blue-100 border-2 border-blue-500 group-first:bg-blue-500"></div>
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <h5 className="text-sm font-semibold text-gray-900">{item.proposal.title}</h5>
+                          {timelineMode === 'expanded' && itemDecision && (
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${
+                              itemDecision.status === 'approved' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
+                            }`}>
+                              {itemDecision.status}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] bg-gray-50 px-2 py-0.5 rounded text-gray-500 uppercase tracking-tighter">SUCCESS</span>
+                          <span className="text-[10px] text-gray-400 font-mono italic">{new Date(item.created_at).toLocaleTimeString()}</span>
+                          {timelineMode === 'expanded' && (
+                            <span className="text-[8px] text-gray-300 font-mono">ID: {item.proposal_id.substring(0, 8)}</span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </li>
-                ))}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ) : (

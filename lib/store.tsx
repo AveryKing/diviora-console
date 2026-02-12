@@ -1,30 +1,42 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useReducer, ReactNode } from 'react';
-import { Proposal, ProposalSchema, Decision, DecisionSchema, RunPlan, RunPlanSchema } from './types';
+import { Proposal, ProposalSchema, Decision, DecisionSchema, RunPlan, RunPlanSchema, Settings, SettingsSchema } from './types';
 
 type State = {
   proposals: Proposal[];
   decisions: Decision[];
   runs: RunPlan[];
+  settings: Settings;
   isLoaded: boolean;
 };
 
 type Action =
-  | { type: 'HYDRATE'; proposals: Proposal[]; decisions: Decision[]; runs: RunPlan[] }
+  | { type: 'HYDRATE'; proposals: Proposal[]; decisions: Decision[]; runs: RunPlan[]; settings: Settings }
   | { type: 'ADD_PROPOSAL'; payload: Proposal }
   | { type: 'SET_DECISION'; payload: Decision }
   | { type: 'ADD_RUN'; payload: RunPlan }
+  | { type: 'UPDATE_SETTINGS'; payload: Partial<Settings> }
   | { type: 'CLEAR_ALL' };
 
 const STORAGE_KEY_PROPOSALS = 'diviora.proposals.v1';
 const STORAGE_KEY_DECISIONS = 'diviora.decisions.v1';
 const STORAGE_KEY_RUNS = 'diviora.runs.v1';
+const STORAGE_KEY_SETTINGS = 'diviora.settings.v1';
+
+const defaultSettings: Settings = {
+  schema_version: 1,
+  proposal_style: 'detailed',
+  risk_level: 'medium',
+  default_step_count: 5,
+  timeline_mode: 'expanded',
+};
 
 const initialState: State = {
   proposals: [],
   decisions: [],
   runs: [],
+  settings: defaultSettings,
   isLoaded: false,
 };
 
@@ -36,6 +48,7 @@ function reducer(state: State, action: Action): State {
         proposals: action.proposals, 
         decisions: action.decisions, 
         runs: action.runs,
+        settings: action.settings,
         isLoaded: true 
       };
     
@@ -84,11 +97,19 @@ function reducer(state: State, action: Action): State {
       return { ...state, runs: newRuns };
     }
 
+    case 'UPDATE_SETTINGS': {
+      const newSettings = { ...state.settings, ...action.payload };
+      localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(newSettings));
+      return { ...state, settings: newSettings };
+    }
+
     case 'CLEAR_ALL':
       localStorage.removeItem(STORAGE_KEY_PROPOSALS);
       localStorage.removeItem(STORAGE_KEY_DECISIONS);
       localStorage.removeItem(STORAGE_KEY_RUNS);
-      return { ...state, proposals: [], decisions: [], runs: [] };
+      localStorage.removeItem(STORAGE_KEY_SETTINGS);
+      localStorage.removeItem('diviora_proposals'); // Legacy
+      return { ...state, proposals: [], decisions: [], runs: [], settings: defaultSettings };
     
     default:
       return state;
@@ -100,7 +121,8 @@ const StoreContext = createContext<{
   addProposal: (proposal: Proposal) => void;
   setDecision: (decision: Decision) => void;
   createRunPlan: (proposal_id: string) => RunPlan;
-  clearAll: () => void;
+  updateSettings: (partial: Partial<Settings>) => void;
+  resetAllData: () => void;
 } | undefined>(undefined);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
@@ -111,10 +133,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const savedProposals = localStorage.getItem(STORAGE_KEY_PROPOSALS) || localStorage.getItem('diviora_proposals');
       const savedDecisions = localStorage.getItem(STORAGE_KEY_DECISIONS);
       const savedRuns = localStorage.getItem(STORAGE_KEY_RUNS);
+      const savedSettings = localStorage.getItem(STORAGE_KEY_SETTINGS);
       
       let proposals: Proposal[] = [];
       let decisions: Decision[] = [];
       let runs: RunPlan[] = [];
+      let settings: Settings = defaultSettings;
 
       if (savedProposals) {
         try {
@@ -158,7 +182,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         } catch (e) { console.error('Failed to parse runs:', e); }
       }
 
-      dispatch({ type: 'HYDRATE', proposals, decisions, runs });
+      if (savedSettings) {
+        try {
+          const parsed = JSON.parse(savedSettings);
+          const result = SettingsSchema.safeParse(parsed);
+          if (result.success) {
+            settings = result.data;
+          }
+        } catch (e) { console.error('Failed to parse settings:', e); }
+      }
+
+      dispatch({ type: 'HYDRATE', proposals, decisions, runs, settings });
     };
 
     loadData();
@@ -166,6 +200,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const addProposal = (payload: Proposal) => dispatch({ type: 'ADD_PROPOSAL', payload });
   const setDecision = (payload: Decision) => dispatch({ type: 'SET_DECISION', payload });
+  const updateSettings = (payload: Partial<Settings>) => dispatch({ type: 'UPDATE_SETTINGS', payload });
+  const resetAllData = () => {
+    if (confirm("Are you sure you want to reset all data? This will clear all history and settings.")) {
+      dispatch({ type: 'CLEAR_ALL' });
+    }
+  };
   
   const createRunPlan = (proposal_id: string): RunPlan => {
     const proposal = state.proposals.find(p => p.proposal_id === proposal_id);
@@ -176,6 +216,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       throw new Error("Cannot create run plan for unapproved proposal");
     }
 
+    // Config-aware run plan generation
+    const stepCount = state.settings.default_step_count;
+    const baseSteps = proposal.proposal.next_actions;
+    let finalSteps = [...baseSteps];
+    
+    if (finalSteps.length > stepCount) {
+      finalSteps = finalSteps.slice(0, stepCount);
+    } else while (finalSteps.length < stepCount) {
+      finalSteps.push(`Additional verification step ${finalSteps.length + 1}`);
+    }
+
+    const riskLevel = state.settings.risk_level;
+    const extraRisks = riskLevel === 'high' 
+      ? ["High-sensitivity production environment", "Complex dependency chain"]
+      : riskLevel === 'medium'
+      ? ["Manual verification required"]
+      : [];
+
     const runPlan: RunPlan = {
       run_id: `run_${Math.random().toString(36).substr(2, 9)}`,
       proposal_id: proposal.proposal_id,
@@ -183,13 +241,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       status: 'planned',
       plan: {
         objective: proposal.proposal.title,
-        steps: proposal.proposal.next_actions.length > 0 
-          ? proposal.proposal.next_actions 
-          : ["Execute proposal objective"],
+        steps: finalSteps,
         inputs_needed: ["Operator approval status"],
         expected_outputs: ["System state reflecting proposal updates"],
-        risks: proposal.proposal.risks,
-        rollback: ["Revert state change via manual override"]
+        risks: [...proposal.proposal.risks, ...extraRisks],
+        rollback: ["Revert state change via manual override", ...(riskLevel === 'high' ? ["Initialize fail-over sequence"] : [])]
       }
     };
 
@@ -197,10 +253,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return runPlan;
   };
 
-  const clearAll = () => dispatch({ type: 'CLEAR_ALL' });
-
   return (
-    <StoreContext.Provider value={{ state, addProposal, setDecision, createRunPlan, clearAll }}>
+    <StoreContext.Provider value={{ state, addProposal, setDecision, createRunPlan, updateSettings, resetAllData }}>
       {children}
     </StoreContext.Provider>
   );
