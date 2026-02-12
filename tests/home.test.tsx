@@ -1,22 +1,28 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Home from '../app/page';
 import { Proposal } from '../lib/types';
+import { StoreProvider } from '../lib/store';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 describe('Home Page', () => {
   beforeEach(() => {
     vi.mocked(fetch).mockClear();
+    window.localStorage.clear();
   });
 
+  const renderWithStore = (ui: React.ReactElement) => {
+    return render(<StoreProvider>{ui}</StoreProvider>);
+  };
+
   it('renders initial empty state', () => {
-    render(<Home />);
+    renderWithStore(<Home />);
     expect(screen.getByPlaceholderText(/Type your message/i)).toBeInTheDocument();
     expect(screen.getByText(/No proposal to display yet/i)).toBeInTheDocument();
     expect(screen.getByText(/No activity recorded yet/i)).toBeInTheDocument();
   });
 
   it('shows error when submitting empty message', async () => {
-    render(<Home />);
+    renderWithStore(<Home />);
     const submitButton = screen.getByText('Submit');
     fireEvent.click(submitButton);
     expect(screen.getByText(/Message cannot be empty/i)).toBeInTheDocument();
@@ -41,7 +47,7 @@ describe('Home Page', () => {
       json: async () => mockProposal,
     } as Response);
 
-    render(<Home />);
+    renderWithStore(<Home />);
     const textarea = screen.getByPlaceholderText(/Type your message/i);
     const submitButton = screen.getByText('Submit');
 
@@ -67,7 +73,7 @@ describe('Home Page', () => {
       json: async () => ({ error: 'Server Error' }),
     } as Response);
 
-    render(<Home />);
+    renderWithStore(<Home />);
     const textarea = screen.getByPlaceholderText(/Type your message/i);
     const submitButton = screen.getByText('Submit');
 
@@ -77,5 +83,38 @@ describe('Home Page', () => {
     await waitFor(() => {
       expect(screen.getByText('Server Error')).toBeInTheDocument();
     });
+  });
+
+  it('persists proposal after re-mount', async () => {
+    const mockProposal: Proposal = {
+      proposal_id: 'prop_persist',
+      created_at: new Date().toISOString(),
+      input: { message: 'Hello' },
+      proposal: {
+        title: 'Persistent Proposal',
+        summary: 'Mock Summary',
+        next_actions: [],
+        risks: [],
+      },
+    };
+
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockProposal,
+    } as Response);
+
+    const { unmount } = renderWithStore(<Home />);
+    fireEvent.change(screen.getByPlaceholderText(/Type your message/i), { target: { value: 'Hello' } });
+    fireEvent.click(screen.getByText('Submit'));
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Persistent Proposal/i).length).toBeGreaterThanOrEqual(1);
+    });
+
+    unmount();
+
+    // Re-render
+    renderWithStore(<Home />);
+    expect(screen.getAllByText(/Persistent Proposal/i).length).toBeGreaterThanOrEqual(1);
   });
 });
