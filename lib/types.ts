@@ -32,3 +32,21 @@ export const DecisionSchema = z.object({
 
 export type Decision = z.infer<typeof DecisionSchema>;
 
+export const RunPlanSchema = z.object({
+  run_id: z.string(),
+  proposal_id: z.string(),
+  created_at: z.string(),
+  status: z.literal('planned'),
+  plan: z.object({
+    objective: z.string(),
+    steps: z.array(z.string()),
+    inputs_needed: z.array(z.string()),
+    expected_outputs: z.array(z.string()),
+    risks: z.array(z.string()),
+    rollback: z.array(z.string()),
+  }),
+});
+
+export type RunPlan = z.infer<typeof RunPlanSchema>;
+
+
