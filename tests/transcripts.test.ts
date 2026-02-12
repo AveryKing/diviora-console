@@ -94,8 +94,9 @@ describe('Run Transcripts (Issue #11)', () => {
     const t2 = result.current.state.transcripts.find(t => t.run_id === run.run_id);
 
     // Should return the exact same object reference if fully idempotent in store
-    // Or if logic re-runs but checks existence, it returns existing. UseStore check:
-    expect(t1).toBe(t2); 
+    // Should return a new transcript (new attempt)
+    expect(t1).not.toBe(t2);
+    expect(t2?.attempt).toBe((t1?.attempt || 0) + 1); 
   });
 
   it('fails to generate transcript for missing run', () => {
