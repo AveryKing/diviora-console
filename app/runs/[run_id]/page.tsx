@@ -16,6 +16,7 @@ export default function RunDetailPage() {
   const [selectedAttemptId, setSelectedAttemptId] = useState<string | null>(null);
   const [diffMode, setDiffMode] = useState(false);
   const [diffTargetId, setDiffTargetId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Safely find run and related data
   const run = state.runs.find(r => r.run_id === run_id);
@@ -30,9 +31,19 @@ export default function RunDetailPage() {
 
   const handleGenerateTranscript = () => {
     if (!run) return;
-    const newT = generateTranscript(run.run_id, selectedScenario);
-    setSelectedAttemptId(newT.transcript_id);
-    setDiffMode(false);
+    try {
+      const newT = generateTranscript(run.run_id, selectedScenario);
+      setSelectedAttemptId(newT.transcript_id);
+      setDiffMode(false);
+      setError(null);
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'name' in err && err.name === 'PolicyError') {
+        const policyErr = err as unknown as { decision: { reasons: string[]; policy_ids: string[] } };
+        setError(`Policy Violation: ${policyErr.decision.reasons.join('; ')} (${policyErr.decision.policy_ids.join(', ')})`);
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to generate transcript');
+      }
+    }
   };
 
   const handleCopyTranscript = () => {
@@ -201,6 +212,30 @@ export default function RunDetailPage() {
                 </button>
             </div>
           </div>
+
+           {/* Error Display */}
+           {error && (
+             <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+               <div className="flex items-start gap-2">
+                 <svg className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                 </svg>
+                 <div className="flex-1">
+                   <h3 className="font-semibold text-red-900 text-sm mb-1">Action Blocked</h3>
+                   <p className="text-red-700 text-sm">{error}</p>
+                 </div>
+                 <button 
+                   onClick={() => setError(null)}
+                   className="text-red-400 hover:text-red-600"
+                 >
+                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                   </svg>
+                 </button>
+               </div>
+             </div>
+           )}
+
           <h1 className="text-3xl font-bold text-gray-900 mb-2">{run.plan.objective}</h1>
           <p className="text-gray-500 text-sm mb-4">
             Derived from Proposal:{' '}

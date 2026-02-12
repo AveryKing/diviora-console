@@ -155,4 +155,12 @@ export const TranscriptsCollectionSchema = z.object({
   items: z.array(RunTranscriptSchema),
 });
 
+export const PolicyDecisionSchema = z.object({
+  allowed: z.boolean(),
+  reasons: z.array(z.string()),
+  policy_ids: z.array(z.string()),
+});
+
+export type PolicyDecision = z.infer<typeof PolicyDecisionSchema>;
+
 

@@ -15,6 +15,7 @@ import {
   TranscriptsCollectionSchema
 } from './types';
 import { migrateLocalStorage, migrateSnapshot } from './migrations';
+import { evaluatePolicy, PolicyError } from './policy';
 
 type State = {
   proposals: Proposal[];
@@ -268,7 +269,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addProposal = (payload: Proposal) => dispatch({ type: 'ADD_PROPOSAL', payload });
-  const setDecision = (payload: Decision) => dispatch({ type: 'SET_DECISION', payload });
+  const setDecision = (payload: Decision) => {
+    const proposal = state.proposals.find(p => p.proposal_id === payload.proposal_id);
+    const actionType = payload.status === 'approved' ? 'APPROVE_PROPOSAL' : 'REJECT_PROPOSAL';
+    const polDecision = evaluatePolicy(
+        { type: actionType }, 
+        { settings: state.settings, proposal, decision: payload }
+    );
+    
+    if (!polDecision.allowed) {
+        throw new PolicyError(`Policy Violation: ${polDecision.reasons[0]}`, polDecision);
+    }
+    dispatch({ type: 'SET_DECISION', payload });
+  };
   const updateSettings = (payload: Partial<Settings>) => dispatch({ type: 'UPDATE_SETTINGS', payload });
   const resetAllData = () => {
     if (confirm("Are you sure you want to reset all data? This will clear all history and settings.")) {
@@ -317,6 +330,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    // Policy Check
+    const polDecision = evaluatePolicy(
+        { type: 'CREATE_RUN_PLAN' }, 
+        { settings: state.settings, proposal, decision, run: runPlan }
+    );
+    if (!polDecision.allowed) {
+        throw new PolicyError(`Policy Violation (Create Run): ${polDecision.reasons[0]}`, polDecision);
+    }
+
     dispatch({ type: 'ADD_RUN', payload: runPlan });
     return runPlan;
   };
@@ -350,6 +372,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const steps = run.plan.steps;
     const risks = run.plan.risks;
     const riskLevel = state.settings.risk_level;
+
+    // Policy Check
+    const isRerun = existingTranscripts.length > 0;
+    const actionType = isRerun ? 'RERUN_TRANSCRIPT' : 'GENERATE_TRANSCRIPT';
+
+    const transcriptProposalId = run.proposal_id;
+    const transcriptDecision = state.decisions.find(d => d.proposal_id === transcriptProposalId);
+
+    const polDecision = evaluatePolicy(
+        { type: actionType, scenarioId }, 
+        { 
+            settings: state.settings, 
+            run, 
+            transcripts: existingTranscripts, 
+            decision: transcriptDecision,
+            counts: { attempts: existingTranscripts.length } 
+        }
+    );
+
+    if (!polDecision.allowed) {
+        throw new PolicyError(`Policy Violation (Transcript): ${polDecision.reasons[0]}`, polDecision);
+    }
 
     // SCENARIO LOGIC
     if (scenarioId === 'validation_error') {
