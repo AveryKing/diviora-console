@@ -64,4 +64,16 @@ export const SettingsSchema = z.object({
 
 export type Settings = z.infer<typeof SettingsSchema>;
 
+export const SnapshotV1Schema = z.object({
+  snapshot_version: z.literal(1),
+  exported_at: z.string(),
+  app_version: z.string().optional(),
+  settings: SettingsSchema,
+  proposals: z.array(ProposalSchema),
+  decisions: z.array(DecisionSchema),
+  runs: z.array(RunPlanSchema),
+});
+
+export type SnapshotV1 = z.infer<typeof SnapshotV1Schema>;
+
 
