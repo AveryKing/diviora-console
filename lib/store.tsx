@@ -173,7 +173,7 @@ const StoreContext = createContext<{
   addProposal: (proposal: Proposal) => void;
   setDecision: (decision: Decision) => void;
   createRunPlan: (proposal_id: string) => RunPlan;
-  generateTranscript: (run_id: string) => RunTranscript;
+  generateTranscript: (run_id: string, scenarioId?: 'happy_path' | 'flaky_inputs' | 'rate_limited' | 'validation_error', seed?: string) => RunTranscript;
   updateSettings: (partial: Partial<Settings>) => void;
   resetAllData: () => void;
   exportSnapshot: () => SnapshotV2;
@@ -321,13 +321,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return runPlan;
   };
 
-  const generateTranscript = (run_id: string): RunTranscript => {
+  const generateTranscript = (run_id: string, scenarioId: 'happy_path' | 'flaky_inputs' | 'rate_limited' | 'validation_error' = 'happy_path', seed?: string): RunTranscript => {
     const run = state.runs.find(r => r.run_id === run_id);
     if (!run) throw new Error("Run not found");
 
-    const existing = state.transcripts.find(t => t.run_id === run_id);
-    if (existing) return existing;
+    const existingTranscripts = state.transcripts.filter(t => t.run_id === run_id);
 
+    
+    // If exact same request (same scenario, no seed override), return existing latest if relevant?
+    // Requirement says: "Rerun creates a NEW transcript record (do not overwrite)."
+    // So we always generate new if explicitly requested via UI action, but maybe idempotency check is for "viewing"?
+    // The previous implementation was idempotent: "if (existing) return existing".
+    // New requirement: "Rerun creates a NEW transcript record".
+    // So if called via the "Rerun" button, we definitely want a new one. But the signature doesn't distinguish "view" from "create".
+    // However, the text says: "Only one “current” transcript shown by default (latest attempt)".
+    // Let's assume this function is ONLY called when we want to GENERATE a new one.
+    // But for backward compatibility/idempotency tests, maybe we check if attempt 1 exists for this scenario?
+    // Actually, "Rerun creates a NEW transcript".
+    // Let's just create new every time this is called, assuming the UI protects against accidental calls.
+    // Wait, "Once generated, transcript is immutable".
+
+    const attempt = existingTranscripts.length + 1;
     const transcriptId = `tx_${Math.random().toString(36).substr(2, 9)}`;
     const createdAt = new Date().toISOString();
     const baseTime = new Date(createdAt).getTime();
@@ -337,47 +351,104 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const risks = run.plan.risks;
     const riskLevel = state.settings.risk_level;
 
-    steps.forEach((step, index) => {
-        // START
-        events.push({
-            ts: new Date(baseTime + (index * 30000)).toISOString(),
-            level: 'info',
-            step_index: index + 1,
-            message: `INIT STEP ${index + 1}: ${step.substring(0, 40)}...`,
+    // SCENARIO LOGIC
+    if (scenarioId === 'validation_error') {
+         events.push({
+            ts: new Date(baseTime).toISOString(),
+            level: 'error',
+            step_index: 0,
+            message: `VALIDATION FAILED: Missing required input 'Operator approval status'.`,
         });
+    } else {
+        // Pseudo-random deterministic
+        const pseudoRandom = (input: number) => {
+             const x = Math.sin(input + (seed ? seed.length : 0) + attempt) * 10000;
+             return x - Math.floor(x);
+        };
 
-        // ACTION
-        events.push({
-            ts: new Date(baseTime + (index * 30000) + 5000).toISOString(),
-            level: 'info',
-            step_index: index + 1,
-            message: `EXECUTING: ${step}`,
-        });
+        let hasFailed = false;
 
-        // WARNING (Deterministic Risk Injection)
-        if (risks.length > 0 && (index + 1) % 2 === 0 && riskLevel !== 'low') {
-             events.push({
-                ts: new Date(baseTime + (index * 30000) + 10000).toISOString(),
-                level: 'warn',
+        steps.forEach((step, index) => {
+            if (hasFailed) return;
+
+            // START
+            events.push({
+                ts: new Date(baseTime + (index * 30000)).toISOString(),
+                level: 'info',
                 step_index: index + 1,
-                message: `RISK CHECK: ${risks[index % risks.length]}`,
+                message: `INIT STEP ${index + 1}: ${step.substring(0, 40)}...`,
             });
-        }
 
-        // RESULT
-        events.push({
-            ts: new Date(baseTime + (index * 30000) + 15000).toISOString(),
-            level: 'info',
-            step_index: index + 1,
-            message: `COMPLETE: Step ${index + 1} finalized successfully.`,
+            // SCENARIO: Rate Limited
+            if (scenarioId === 'rate_limited' && index === 1) {
+                events.push({
+                    ts: new Date(baseTime + (index * 30000) + 2000).toISOString(),
+                    level: 'error',
+                    step_index: index + 1,
+                    message: `API ERROR: 429 Too Many Requests. Retry-After: 30s.`,
+                });
+                hasFailed = true;
+                return;
+            }
+
+            // ACTION
+            events.push({
+                ts: new Date(baseTime + (index * 30000) + 5000).toISOString(),
+                level: 'info',
+                step_index: index + 1,
+                message: `EXECUTING: ${step}`,
+            });
+
+            // SCENARIO: Flaky Inputs
+            if (scenarioId === 'flaky_inputs') {
+                if (index === 2) { // Fail on 3rd step
+                     events.push({
+                        ts: new Date(baseTime + (index * 30000) + 7000).toISOString(),
+                        level: 'error',
+                        step_index: index + 1,
+                        message: `RUNTIME ERROR: Input data inconsistent with schema v2.`,
+                    });
+                    hasFailed = true;
+                    return;
+                }
+                // Determine warnings
+                if (pseudoRandom(index) > 0.3) {
+                     events.push({
+                        ts: new Date(baseTime + (index * 30000) + 8000).toISOString(),
+                        level: 'warn',
+                        step_index: index + 1,
+                        message: `FLAKY: unexpected latency detected (${Math.floor(pseudoRandom(index)*500)}ms).`,
+                    });
+                }
+            }
+
+            // WARNING (Deterministic Risk Injection from happy path)
+            if (scenarioId === 'happy_path' && risks.length > 0 && (index + 1) % 2 === 0 && riskLevel !== 'low') {
+                 events.push({
+                    ts: new Date(baseTime + (index * 30000) + 10000).toISOString(),
+                    level: 'warn',
+                    step_index: index + 1,
+                    message: `RISK CHECK: ${risks[index % risks.length]}`,
+                });
+            }
+
+            // RESULT
+            events.push({
+                ts: new Date(baseTime + (index * 30000) + 15000).toISOString(),
+                level: 'info',
+                step_index: index + 1,
+                message: `COMPLETE: Step ${index + 1} finalized successfully.`,
+            });
         });
-    });
+    }
 
     const transcript: RunTranscript = {
         transcript_id: transcriptId,
         run_id: run.run_id,
         created_at: createdAt,
         status: 'simulated',
+        scenario_id: scenarioId,
+        attempt: attempt,
         events: events
     };
 

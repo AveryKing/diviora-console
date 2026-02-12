@@ -130,11 +130,15 @@ export const RunsCollectionSchema = z.object({
   items: z.array(RunPlanSchema),
 });
 
+export type ScenarioId = 'happy_path' | 'flaky_inputs' | 'rate_limited' | 'validation_error';
+
 export const RunTranscriptSchema = z.object({
   transcript_id: z.string(),
   run_id: z.string(),
   created_at: z.string(),
   status: z.literal('simulated'),
+  scenario_id: z.enum(['happy_path', 'flaky_inputs', 'rate_limited', 'validation_error']).optional(), // Optional for backward/migration compat
+  attempt: z.number().default(1),
   events: z.array(z.object({
     ts: z.string(),
     level: z.enum(['info', 'warn', 'error']),
