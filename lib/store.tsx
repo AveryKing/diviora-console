@@ -1,29 +1,43 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useReducer, ReactNode } from 'react';
-import { Proposal, ProposalSchema, Decision, DecisionSchema, RunPlan, RunPlanSchema, Settings, SettingsSchema, SnapshotV1, SnapshotV1Schema } from './types';
+import { 
+  Proposal, 
+  Decision, 
+  RunPlan, 
+  Settings, SettingsSchema,
+  SnapshotV2, SnapshotV2Schema,
+  AppMetadata, AppMetadataSchema,
+  ProposalsCollectionSchema,
+  DecisionsCollectionSchema,
+  RunsCollectionSchema
+} from './types';
+import { migrateLocalStorage, migrateSnapshot } from './migrations';
 
 type State = {
   proposals: Proposal[];
   decisions: Decision[];
   runs: RunPlan[];
   settings: Settings;
+  metadata: AppMetadata;
   isLoaded: boolean;
 };
 
 type Action =
-  | { type: 'HYDRATE'; proposals: Proposal[]; decisions: Decision[]; runs: RunPlan[]; settings: Settings }
+  | { type: 'HYDRATE'; proposals: Proposal[]; decisions: Decision[]; runs: RunPlan[]; settings: Settings; metadata: AppMetadata }
   | { type: 'ADD_PROPOSAL'; payload: Proposal }
   | { type: 'SET_DECISION'; payload: Decision }
   | { type: 'ADD_RUN'; payload: RunPlan }
   | { type: 'UPDATE_SETTINGS'; payload: Partial<Settings> }
-  | { type: 'REPLACE_STATE'; payload: State }
+  | { type: 'UPDATE_METADATA'; payload: Partial<AppMetadata> }
+  | { type: 'REPLACE_STATE'; payload: Omit<State, 'isLoaded'> }
   | { type: 'CLEAR_ALL' };
 
 const STORAGE_KEY_PROPOSALS = 'diviora.proposals.v1';
 const STORAGE_KEY_DECISIONS = 'diviora.decisions.v1';
 const STORAGE_KEY_RUNS = 'diviora.runs.v1';
 const STORAGE_KEY_SETTINGS = 'diviora.settings.v1';
+const STORAGE_KEY_METADATA = 'diviora.metadata.v1';
 
 const defaultSettings: Settings = {
   schema_version: 1,
@@ -38,6 +52,7 @@ const initialState: State = {
   decisions: [],
   runs: [],
   settings: defaultSettings,
+  metadata: {},
   isLoaded: false,
 };
 
@@ -46,10 +61,7 @@ function reducer(state: State, action: Action): State {
     case 'HYDRATE':
       return { 
         ...state, 
-        proposals: action.proposals, 
-        decisions: action.decisions, 
-        runs: action.runs,
-        settings: action.settings,
+        ...action,
         isLoaded: true 
       };
     
@@ -64,7 +76,7 @@ function reducer(state: State, action: Action): State {
       }
       newProposals.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       
-      localStorage.setItem(STORAGE_KEY_PROPOSALS, JSON.stringify(newProposals));
+      localStorage.setItem(STORAGE_KEY_PROPOSALS, JSON.stringify({ schema_version: 1, items: newProposals }));
       return { ...state, proposals: newProposals };
     }
 
@@ -79,7 +91,7 @@ function reducer(state: State, action: Action): State {
       }
       newDecisions.sort((a, b) => new Date(b.decided_at).getTime() - new Date(a.decided_at).getTime());
       
-      localStorage.setItem(STORAGE_KEY_DECISIONS, JSON.stringify(newDecisions));
+      localStorage.setItem(STORAGE_KEY_DECISIONS, JSON.stringify({ schema_version: 1, items: newDecisions }));
       return { ...state, decisions: newDecisions };
     }
 
@@ -94,7 +106,7 @@ function reducer(state: State, action: Action): State {
       }
       newRuns.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       
-      localStorage.setItem(STORAGE_KEY_RUNS, JSON.stringify(newRuns));
+      localStorage.setItem(STORAGE_KEY_RUNS, JSON.stringify({ schema_version: 1, items: newRuns }));
       return { ...state, runs: newRuns };
     }
 
@@ -104,12 +116,19 @@ function reducer(state: State, action: Action): State {
       return { ...state, settings: newSettings };
     }
 
+    case 'UPDATE_METADATA': {
+      const newMetadata = { ...state.metadata, ...action.payload };
+      localStorage.setItem(STORAGE_KEY_METADATA, JSON.stringify(newMetadata));
+      return { ...state, metadata: newMetadata };
+    }
+
     case 'REPLACE_STATE': {
-      const { proposals, decisions, runs, settings } = action.payload;
-      localStorage.setItem(STORAGE_KEY_PROPOSALS, JSON.stringify(proposals));
-      localStorage.setItem(STORAGE_KEY_DECISIONS, JSON.stringify(decisions));
-      localStorage.setItem(STORAGE_KEY_RUNS, JSON.stringify(runs));
+      const { proposals, decisions, runs, settings, metadata } = action.payload;
+      localStorage.setItem(STORAGE_KEY_PROPOSALS, JSON.stringify({ schema_version: 1, items: proposals }));
+      localStorage.setItem(STORAGE_KEY_DECISIONS, JSON.stringify({ schema_version: 1, items: decisions }));
+      localStorage.setItem(STORAGE_KEY_RUNS, JSON.stringify({ schema_version: 1, items: runs }));
       localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(settings));
+      localStorage.setItem(STORAGE_KEY_METADATA, JSON.stringify(metadata));
       return { ...action.payload, isLoaded: true };
     }
 
@@ -118,8 +137,9 @@ function reducer(state: State, action: Action): State {
       localStorage.removeItem(STORAGE_KEY_DECISIONS);
       localStorage.removeItem(STORAGE_KEY_RUNS);
       localStorage.removeItem(STORAGE_KEY_SETTINGS);
-      localStorage.removeItem('diviora_proposals'); // Legacy
-      return { ...state, proposals: [], decisions: [], runs: [], settings: defaultSettings };
+      localStorage.removeItem(STORAGE_KEY_METADATA);
+      localStorage.removeItem('diviora_proposals');
+      return { ...state, proposals: [], decisions: [], runs: [], settings: defaultSettings, metadata: {} };
     
     default:
       return state;
@@ -133,7 +153,7 @@ const StoreContext = createContext<{
   createRunPlan: (proposal_id: string) => RunPlan;
   updateSettings: (partial: Partial<Settings>) => void;
   resetAllData: () => void;
-  exportSnapshot: () => SnapshotV1;
+  exportSnapshot: () => SnapshotV2;
   importSnapshot: (snapshot: unknown) => { ok: true } | { ok: false, error: string };
 } | undefined>(undefined);
 
@@ -142,26 +162,26 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const loadData = () => {
-      const savedProposals = localStorage.getItem(STORAGE_KEY_PROPOSALS) || localStorage.getItem('diviora_proposals');
+      migrateLocalStorage();
+
+      const savedProposals = localStorage.getItem(STORAGE_KEY_PROPOSALS);
       const savedDecisions = localStorage.getItem(STORAGE_KEY_DECISIONS);
       const savedRuns = localStorage.getItem(STORAGE_KEY_RUNS);
       const savedSettings = localStorage.getItem(STORAGE_KEY_SETTINGS);
+      const savedMetadata = localStorage.getItem(STORAGE_KEY_METADATA);
       
       let proposals: Proposal[] = [];
       let decisions: Decision[] = [];
       let runs: RunPlan[] = [];
       let settings: Settings = defaultSettings;
+      let metadata: AppMetadata = {};
 
       if (savedProposals) {
         try {
           const parsed = JSON.parse(savedProposals);
-          if (Array.isArray(parsed)) {
-            proposals = parsed
-              .map(p => {
-                const result = ProposalSchema.safeParse(p);
-                return result.success ? result.data : null;
-              })
-              .filter((p): p is Proposal => p !== null);
+          const result = ProposalsCollectionSchema.safeParse(parsed);
+          if (result.success) {
+            proposals = result.data.items;
           }
         } catch (e) { console.error('Failed to parse proposals:', e); }
       }
@@ -169,13 +189,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (savedDecisions) {
         try {
           const parsed = JSON.parse(savedDecisions);
-          if (Array.isArray(parsed)) {
-            decisions = parsed
-              .map(d => {
-                const result = DecisionSchema.safeParse(d);
-                return result.success ? result.data : null;
-              })
-              .filter((d): d is Decision => d !== null);
+          const result = DecisionsCollectionSchema.safeParse(parsed);
+          if (result.success) {
+            decisions = result.data.items;
           }
         } catch (e) { console.error('Failed to parse decisions:', e); }
       }
@@ -183,13 +199,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (savedRuns) {
         try {
           const parsed = JSON.parse(savedRuns);
-          if (Array.isArray(parsed)) {
-            runs = parsed
-              .map(r => {
-                const result = RunPlanSchema.safeParse(r);
-                return result.success ? result.data : null;
-              })
-              .filter((r): r is RunPlan => r !== null);
+          const result = RunsCollectionSchema.safeParse(parsed);
+          if (result.success) {
+            runs = result.data.items;
           }
         } catch (e) { console.error('Failed to parse runs:', e); }
       }
@@ -204,7 +216,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         } catch (e) { console.error('Failed to parse settings:', e); }
       }
 
-      dispatch({ type: 'HYDRATE', proposals, decisions, runs, settings });
+      if (savedMetadata) {
+        try {
+          const parsed = JSON.parse(savedMetadata);
+          const result = AppMetadataSchema.safeParse(parsed);
+          if (result.success) {
+            metadata = result.data;
+          }
+        } catch (e) { console.error('Failed to parse metadata:', e); }
+      }
+
+      dispatch({ type: 'HYDRATE', proposals, decisions, runs, settings, metadata });
     };
 
     loadData();
@@ -228,7 +250,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       throw new Error("Cannot create run plan for unapproved proposal");
     }
 
-    // Config-aware run plan generation
     const stepCount = state.settings.default_step_count;
     const baseSteps = proposal.proposal.next_actions;
     let finalSteps = [...baseSteps];
@@ -265,11 +286,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return runPlan;
   };
 
-  const exportSnapshot = (): SnapshotV1 => {
+  const exportSnapshot = (): SnapshotV2 => {
+    const now = new Date().toISOString();
+    dispatch({ type: 'UPDATE_METADATA', payload: { last_exported_at: now } });
     return {
-      snapshot_version: 1,
-      exported_at: new Date().toISOString(),
+      snapshot_version: 2,
+      exported_at: now,
       app_version: "0.1.0",
+      state_schema_versions: {
+        settings: 1,
+        proposals: 1,
+        decisions: 1,
+        runs: 1,
+      },
       settings: state.settings,
       proposals: state.proposals,
       decisions: state.decisions,
@@ -279,15 +308,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const importSnapshot = (payload: unknown): { ok: true } | { ok: false, error: string } => {
     try {
-      const result = SnapshotV1Schema.safeParse(payload);
+      const snapshot = migrateSnapshot(payload);
+      
+      const result = SnapshotV2Schema.safeParse(snapshot);
       if (!result.success) {
         return { ok: false, error: `Invalid snapshot schema: ${result.error.issues[0].message}` };
       }
 
-      const snapshot = result.data;
       const proposalIds = new Set(snapshot.proposals.map(p => p.proposal_id));
 
-      // Referential Integrity Checks
       for (const d of snapshot.decisions) {
         if (!proposalIds.has(d.proposal_id)) {
           return { ok: false, error: `Referential integrity failed: Decision ${d.decision_id} refers to missing proposal ${d.proposal_id}` };
@@ -300,6 +329,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      const now = new Date().toISOString();
+      const updatedMetadata: AppMetadata = {
+        ...state.metadata,
+        last_imported_at: now,
+        last_imported_version: snapshot.snapshot_version,
+      };
+
       dispatch({ 
         type: 'REPLACE_STATE', 
         payload: {
@@ -307,7 +343,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           decisions: snapshot.decisions,
           runs: snapshot.runs,
           settings: snapshot.settings,
-          isLoaded: true
+          metadata: updatedMetadata
         }
       });
 

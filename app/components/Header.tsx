@@ -9,6 +9,7 @@ const navLinks = [
   { href: '/approvals', label: 'Approvals' },
   { href: '/runs', label: 'Runs' },
   { href: '/settings', label: 'Settings' },
+  { href: '/about', label: 'About' },
 ]
 
 export default function Header() {
