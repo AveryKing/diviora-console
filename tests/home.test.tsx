@@ -117,4 +117,127 @@ describe('Home Page', () => {
     renderWithStore(<Home />);
     expect(screen.getAllByText(/Persistent Proposal/i).length).toBeGreaterThanOrEqual(1);
   });
+  
+  it('sends full settings including template_id in the compile request', async () => {
+    // Set custom settings in localStorage before rendering
+    const customSettings = {
+      schema_version: 1,
+      proposal_style: 'concise',
+      risk_level: 'high',
+      default_step_count: 7,
+      timeline_mode: 'expanded',
+      template_id: 'bug_triage',
+    };
+    window.localStorage.setItem('diviora.settings.v1', JSON.stringify(customSettings));
+
+    const mockProposal: Proposal = {
+      proposal_id: 'prop_123',
+      created_at: new Date().toISOString(),
+      input: { message: 'Fix bug' },
+      proposal: {
+        title: 'Fix Bug Proposal',
+        summary: 'Summary',
+        next_actions: ['Action 1'],
+        risks: ['Risk 1'],
+        template_id: 'bug_triage',
+      },
+    };
+
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockProposal,
+    } as Response);
+
+    renderWithStore(<Home />);
+    
+    const textarea = screen.getByPlaceholderText(/Type your message/i);
+    const submitButton = screen.getByText('Submit');
+
+    fireEvent.change(textarea, { target: { value: 'Fix bug' } });
+    fireEvent.click(submitButton);
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalled();
+    });
+
+    const fetchCall = vi.mocked(fetch).mock.calls[0];
+    const requestBody = JSON.parse(fetchCall[1]?.body as string);
+
+    expect(requestBody.message).toBe('Fix bug');
+    expect(requestBody.settings).toEqual(expect.objectContaining({
+      proposal_style: 'concise',
+      risk_level: 'high',
+      default_step_count: 7,
+      template_id: 'bug_triage',
+    }));
+  });
+
+  it('renders sections as primary view when available', async () => {
+    const mockProposal: Proposal = {
+      proposal_id: 'prop_sections',
+      created_at: new Date().toISOString(),
+      input: { message: 'Sections test' },
+      proposal: {
+        title: 'Sections Proposal',
+        summary: 'Should be hidden',
+        next_actions: ['Legacy action'], // Should be hidden
+        risks: ['Legacy risk'], // Should be hidden
+        template_id: 'bug_triage',
+        sections: [
+          { key: 'repro', title: 'Reproduction Steps', content: ['Step 1', 'Step 2'] },
+          { key: 'fix', title: 'Fix Plan', content: 'Apply patch' }
+        ],
+      },
+    };
+
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockProposal,
+    } as Response);
+
+    renderWithStore(<Home />);
+    fireEvent.change(screen.getByPlaceholderText(/Type your message/i), { target: { value: 'test' } });
+    fireEvent.click(screen.getByText('Submit'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /Reproduction Steps/i })).toBeInTheDocument();
+      expect(screen.getByText(/Step 1/i)).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /Fix Plan/i })).toBeInTheDocument();
+      expect(screen.getByText(/Apply patch/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/bug triage/i).length).toBeGreaterThanOrEqual(1); // Badge and/or timeline
+    });
+
+    // Legacy fields should NOT be rendered
+    expect(screen.queryByText(/Should be hidden/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Legacy action/i)).not.toBeInTheDocument();
+  });
+
+  it('falls back to legacy layout when sections are missing', async () => {
+    const mockProposal: Proposal = {
+      proposal_id: 'prop_legacy',
+      created_at: new Date().toISOString(),
+      input: { message: 'Legacy test' },
+      proposal: {
+        title: 'Legacy Proposal',
+        summary: 'Visible Summary',
+        next_actions: ['Action 1'],
+        risks: ['Risk 1'],
+      },
+    };
+
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockProposal,
+    } as Response);
+
+    renderWithStore(<Home />);
+    fireEvent.change(screen.getByPlaceholderText(/Type your message/i), { target: { value: 'test' } });
+    fireEvent.click(screen.getByText('Submit'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Visible Summary/i)).toBeInTheDocument();
+      expect(screen.getByText(/NEXT ACTIONS/i)).toBeInTheDocument();
+      expect(screen.getByText(/Action 1/i)).toBeInTheDocument();
+    });
+  });
 });
