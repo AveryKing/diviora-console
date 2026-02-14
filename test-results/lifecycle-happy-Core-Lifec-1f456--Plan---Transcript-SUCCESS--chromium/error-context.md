@@ -11,8 +11,8 @@
               - img "previous" [ref=e9]
             - generic [ref=e11]:
               - generic [ref=e12]: 1/
-              - text: "2"
-            - button "next" [ref=e13] [cursor=pointer]:
+              - text: "1"
+            - button "next" [disabled] [ref=e13]:
               - img "next" [ref=e14]
           - img
         - generic [ref=e16]:
@@ -38,51 +38,43 @@
             - generic [ref=e50]:
               - paragraph [ref=e52]:
                 - img [ref=e54]
-                - generic [ref=e57]: app/components/CopilotProvider.tsx (15:5) @ CopilotProvider
+                - generic [ref=e57]: app/layout.tsx (33:11) @ RootLayout
                 - button "Open in editor" [ref=e58] [cursor=pointer]:
                   - img [ref=e60]
               - generic [ref=e63]:
-                - generic [ref=e64]: "13 | export function CopilotProvider({ children }: CopilotProviderProps) {"
-                - generic [ref=e65]: 14 | return (
-                - generic [ref=e66]: "> 15 | <CopilotKit runtimeUrl=\"/api/copilot\">"
+                - generic [ref=e64]: "31 | <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50 min-h-screen`}>"
+                - generic [ref=e65]: 32 | <StoreProvider>
+                - generic [ref=e66]: "> 33 | <CopilotProvider>"
                 - generic [ref=e67]: "| ^"
-                - generic [ref=e68]: 16 | <CopilotContextHandler />
-                - generic [ref=e69]: "17 | {children}"
-                - generic [ref=e70]: 18 | <DivioraCopilotSidebar />
+                - generic [ref=e68]: 34 | <Header />
+                - generic [ref=e69]: 35 | <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+                - generic [ref=e70]: "36 | {children}"
             - generic [ref=e71]:
               - generic [ref=e72]:
                 - paragraph [ref=e73]:
                   - text: Call Stack
-                  - generic [ref=e74]: "21"
-                - button "Show 19 ignore-listed frame(s)" [ref=e75] [cursor=pointer]:
-                  - text: Show 19 ignore-listed frame(s)
+                  - generic [ref=e74]: "18"
+                - button "Show 17 ignore-listed frame(s)" [ref=e75] [cursor=pointer]:
+                  - text: Show 17 ignore-listed frame(s)
                   - img [ref=e76]
               - generic [ref=e78]:
                 - generic [ref=e79]:
-                  - text: CopilotProvider
-                  - button "Open CopilotProvider in editor" [ref=e80] [cursor=pointer]:
-                    - img [ref=e81]
-                - text: app/components/CopilotProvider.tsx (15:5)
-              - generic [ref=e83]:
-                - generic [ref=e84]:
                   - text: RootLayout
-                  - button "Open RootLayout in editor" [ref=e85] [cursor=pointer]:
-                    - img [ref=e86]
+                  - button "Open RootLayout in editor" [ref=e80] [cursor=pointer]:
+                    - img [ref=e81]
                 - text: app/layout.tsx (33:11)
-        - generic [ref=e88]: "1"
-        - generic [ref=e89]: "2"
-    - generic [ref=e94] [cursor=pointer]:
-      - button "Open Next.js Dev Tools" [ref=e95]:
-        - img [ref=e96]
-      - generic [ref=e99]:
-        - button "Open issues overlay" [ref=e100]:
-          - generic [ref=e101]:
-            - generic [ref=e102]: "1"
-            - generic [ref=e103]: "2"
-          - generic [ref=e104]:
-            - text: Issue
-            - generic [ref=e105]: s
-        - button "Collapse issues badge" [ref=e106]:
-          - img [ref=e107]
-  - 'heading "Application error: a client-side exception has occurred while loading localhost (see the browser console for more information)." [level=2] [ref=e111]'
+        - generic [ref=e83]: "1"
+        - generic [ref=e84]: "2"
+    - generic [ref=e89] [cursor=pointer]:
+      - button "Open Next.js Dev Tools" [ref=e90]:
+        - img [ref=e91]
+      - generic [ref=e94]:
+        - button "Open issues overlay" [ref=e95]:
+          - generic [ref=e96]:
+            - generic [ref=e97]: "0"
+            - generic [ref=e98]: "1"
+          - generic [ref=e99]: Issue
+        - button "Collapse issues badge" [ref=e100]:
+          - img [ref=e101]
+  - 'heading "Application error: a client-side exception has occurred while loading localhost (see the browser console for more information)." [level=2] [ref=e105]'
 ```

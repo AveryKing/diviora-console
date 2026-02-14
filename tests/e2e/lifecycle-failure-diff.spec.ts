@@ -9,11 +9,11 @@ test.describe('Core Lifecycle - Failure & Diff', () => {
     
     // 2. Setup initial state: Proposal -> Approve -> Run Plan
     await page.goto('/');
-    await page.fill('[data-testid="chat-input"]', 'Connectivity issues in Region East.');
-    await page.click('[data-testid="chat-submit"]');
+    await page.fill('[data-testid="home-compose-textarea"]', 'Connectivity issues in Region East.');
+    await page.click('[data-testid="home-compose-submit"]');
     
-    await expect(page.locator('[data-testid="latest-proposal-container"]')).toBeVisible();
-    await page.click('[data-testid="latest-proposal-container"] >> text=View Full Detailed Artifact');
+    await expect(page.locator('[data-testid="latest-proposal-link"]')).toBeVisible();
+    await page.click('[data-testid="latest-proposal-link"]');
     
     await page.click('[data-testid="approve-button"]');
     await page.click('[data-testid="create-run-plan"]');

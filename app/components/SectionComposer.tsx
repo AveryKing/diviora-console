@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { BugTriageFields, assembleBugTriagePrompt, parseBugTriageFromText } from '../../lib/prompt_assembly';
 
 interface SectionComposerProps {
