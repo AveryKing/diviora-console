@@ -11,7 +11,7 @@
               - img "previous" [ref=e9]
             - generic [ref=e11]:
               - generic [ref=e12]: 1/
-              - text: "2"
+              - text: "3"
             - button "next" [ref=e13] [cursor=pointer]:
               - img "next" [ref=e14]
           - img
@@ -21,11 +21,11 @@
             - generic "Latest available version is detected (16.1.6)." [ref=e20]: Next.js 16.1.6
             - generic [ref=e21]: Turbopack
           - img
-      - dialog "Runtime Error" [ref=e23]:
+      - dialog "Recoverable Error" [ref=e23]:
         - generic [ref=e26]:
           - generic [ref=e27]:
             - generic [ref=e28]:
-              - generic [ref=e30]: Runtime Error
+              - generic [ref=e30]: Recoverable Error
               - generic [ref=e31]:
                 - button "Copy Error Info" [ref=e32] [cursor=pointer]:
                   - img [ref=e33]
@@ -38,37 +38,37 @@
             - generic [ref=e50]:
               - paragraph [ref=e52]:
                 - img [ref=e54]
-                - generic [ref=e57]: app/components/CopilotProvider.tsx (15:5) @ CopilotProvider
+                - generic [ref=e57]: app/components/home/ChatFirstHome.tsx (34:17) @ ChatFirstHome
                 - button "Open in editor" [ref=e58] [cursor=pointer]:
                   - img [ref=e60]
               - generic [ref=e63]:
-                - generic [ref=e64]: "13 | export function CopilotProvider({ children }: CopilotProviderProps) {"
-                - generic [ref=e65]: 14 | return (
-                - generic [ref=e66]: "> 15 | <CopilotKit runtimeUrl=\"/api/copilot\">"
+                - generic [ref=e64]: "32 | {/* Chat Interface */}"
+                - generic [ref=e65]: 33 | <div className="flex-1 overflow-y-auto">
+                - generic [ref=e66]: "> 34 | <CopilotChat"
                 - generic [ref=e67]: "| ^"
-                - generic [ref=e68]: 16 | <CopilotContextHandler />
-                - generic [ref=e69]: "17 | {children}"
-                - generic [ref=e70]: 18 | <DivioraCopilotSidebar />
+                - generic [ref=e68]: 35 | className="h-full border-none shadow-none bg-transparent"
+                - generic [ref=e69]: 36 | instructions="You are a helpful assistant for the Diviora Console. You help users refine their proposals and clarify their needs. You can see the current artifact context and settings."
+                - generic [ref=e70]: "37 | labels={{"
             - generic [ref=e71]:
               - generic [ref=e72]:
                 - paragraph [ref=e73]:
                   - text: Call Stack
-                  - generic [ref=e74]: "21"
-                - button "Show 19 ignore-listed frame(s)" [ref=e75] [cursor=pointer]:
-                  - text: Show 19 ignore-listed frame(s)
+                  - generic [ref=e74]: "22"
+                - button "Show 20 ignore-listed frame(s)" [ref=e75] [cursor=pointer]:
+                  - text: Show 20 ignore-listed frame(s)
                   - img [ref=e76]
               - generic [ref=e78]:
                 - generic [ref=e79]:
-                  - text: CopilotProvider
-                  - button "Open CopilotProvider in editor" [ref=e80] [cursor=pointer]:
+                  - text: ChatFirstHome
+                  - button "Open ChatFirstHome in editor" [ref=e80] [cursor=pointer]:
                     - img [ref=e81]
-                - text: app/components/CopilotProvider.tsx (15:5)
+                - text: app/components/home/ChatFirstHome.tsx (34:17)
               - generic [ref=e83]:
                 - generic [ref=e84]:
-                  - text: RootLayout
-                  - button "Open RootLayout in editor" [ref=e85] [cursor=pointer]:
+                  - text: Home
+                  - button "Open Home in editor" [ref=e85] [cursor=pointer]:
                     - img [ref=e86]
-                - text: app/layout.tsx (33:11)
+                - text: app/page.tsx (6:10)
         - generic [ref=e88]: "1"
         - generic [ref=e89]: "2"
     - generic [ref=e94] [cursor=pointer]:
@@ -77,8 +77,8 @@
       - generic [ref=e99]:
         - button "Open issues overlay" [ref=e100]:
           - generic [ref=e101]:
-            - generic [ref=e102]: "1"
-            - generic [ref=e103]: "2"
+            - generic [ref=e102]: "2"
+            - generic [ref=e103]: "3"
           - generic [ref=e104]:
             - text: Issue
             - generic [ref=e105]: s

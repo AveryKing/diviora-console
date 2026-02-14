@@ -21,14 +21,17 @@ test.describe('Core Lifecycle - Happy Path', () => {
     // 3. Submit bug message
     await page.goto('/');
     const bugMessage = 'Fixed button overlap on mobile in the checkout flow.';
-    await page.fill('[data-testid="chat-input"]', bugMessage);
-    await page.click('[data-testid="chat-submit"]');
+    await page.fill('[data-testid="home-compose-textarea"]', bugMessage);
+    await page.click('[data-testid="home-compose-submit"]');
 
-    // 4. Assert latest proposal shows “Reproduction Steps” (part of bug_triage template)
-    await expect(page.locator('[data-testid="latest-proposal-container"]')).toContainText('Reproduction Steps');
+    // 4. Assert latest proposal link is present
+    await expect(page.locator('[data-testid="latest-proposal-link"]')).toBeVisible();
 
     // 5. Open artifacts newest detail and assert template badge bug_triage
-    await page.click('[data-testid="latest-proposal-container"] >> text=View Full Detailed Artifact');
+    await page.click('[data-testid="latest-proposal-link"]');
+    
+    // Check "Reproduction Steps" after navigation
+    await expect(page.getByText('Reproduction Steps')).toBeVisible();
     await expect(page.locator('[data-testid="proposal-template-badge"]')).toContainText(/BUG TRIAGE/i);
 
     // 6. Approve with note

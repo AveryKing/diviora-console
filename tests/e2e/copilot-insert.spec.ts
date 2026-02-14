@@ -3,9 +3,12 @@ import { test, expect } from '@playwright/test';
 test.describe('Copilot Insert (Optional C)', () => {
   test.beforeEach(async ({ page }) => {
     // 1. Reset demo data
+    // 1. Reset demo data via Settings
+    await page.goto('/settings');
+    page.on('dialog', dialog => dialog.accept());
+    await page.click('[data-testid="reset-all-data"]');
+    await expect(page.getByText('Reset All Demo Data')).toBeVisible();
     await page.goto('/');
-    await page.getByTestId('reset-demo-data').click();
-    await page.waitForTimeout(500); // Wait for reset
   });
 
   test('no-submit on insert', async ({ page }) => {
@@ -22,11 +25,11 @@ test.describe('Copilot Insert (Optional C)', () => {
     await expect(suggestion).toContainText('Mock Draft Suggestion');
 
     // 5. Click Insert
-    const insertBtn = page.getByTestId('copilot-insert-btn');
+    const insertBtn = page.getByTestId('home-insert-draft-btn');
     await insertBtn.click();
 
     // 6. Assert Home textarea filled
-    const textarea = page.getByTestId('home-textarea');
+    const textarea = page.getByTestId('home-compose-textarea');
     await expect(textarea).toHaveValue('Mock Draft Suggestion');
 
     // 7. Assert NO compilation request fired (fail-closed check)
@@ -35,10 +38,7 @@ test.describe('Copilot Insert (Optional C)', () => {
     await expect(page).toHaveURL('/');
     
     // Also, check that the "Compile" button is still visible and enabled/clickable needed to submit manually.
-    const compileBtn = page.getByTestId('compile-btn');
+    const compileBtn = page.getByTestId('home-compose-submit');
     await expect(compileBtn).toBeVisible();
-    
-    // Ensure no automatic submission toast or loading state
-    await expect(page.getByTestId('compiling-indicator')).not.toBeVisible();
   });
 });

@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SectionComposer } from '../app/components/SectionComposer';
-import { assembleBugTriagePrompt } from '../lib/prompt_assembly';
 
 describe('SectionComposer', () => {
     const mockOnAssemble = vi.fn();
