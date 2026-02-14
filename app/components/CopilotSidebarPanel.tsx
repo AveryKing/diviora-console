@@ -5,10 +5,13 @@ import { usePathname } from 'next/navigation';
 import { useStore } from '../../lib/store';
 import { TemplateChecklist } from './TemplateChecklist';
 import { StreamingText } from './StreamingText';
+import { DiffView } from './DiffView';
+import { SectionComposer } from './SectionComposer';
 
 export function CopilotSidebarPanel() {
   const [draft, setDraft] = useState<string | null>(null);
   const [showToast, setShowToast] = useState(false);
+  const [showDiff, setShowDiff] = useState(false);
   const { state } = useStore();
   const latestProposal = state.proposals[0] || null;
   const pathname = usePathname();
@@ -62,8 +65,33 @@ export function CopilotSidebarPanel() {
               </svg>
             </button>
           </div>
+
+          <div className="flex justify-end mb-2">
+             <button
+                onClick={() => setShowDiff(!showDiff)}
+                data-testid="copilot-diff-toggle"
+                className="text-[10px] text-blue-600 underline hover:text-blue-800"
+             >
+                {showDiff ? 'Show Preview' : 'Show Diff'}
+             </button>
+          </div>
           
-          <StreamingText key={draft} text={draft} />
+          {showDiff ? (
+            <DiffView 
+              original={latestProposal?.input?.message || ''} 
+              modified={draft} 
+            />
+          ) : (
+            <StreamingText key={draft} text={draft} />
+          )}
+
+          {state.settings.template_id === 'bug_triage' && (
+            <SectionComposer 
+              draft={draft} 
+              onAssemble={setDraft} 
+              className="mt-4"
+            />
+          )}
 
           <div className="flex gap-2 mt-4">
             {isHome ? (
