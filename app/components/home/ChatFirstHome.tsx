@@ -1,19 +1,98 @@
 'use client';
 
-import { useState } from 'react';
-import { useCopilotChat } from "@copilotkit/react-core";
+import { useState, useEffect } from 'react';
+import { useCopilotChat, CopilotKit } from "@copilotkit/react-core";
 import { CopilotChat } from "@copilotkit/react-ui";
-import { TextMessage, Role } from "@copilotkit/runtime-client-gql";
+import { TextMessage, Role, TextMessage as TextMessageType } from "@copilotkit/runtime-client-gql";
+import "@copilotkit/react-ui/styles.css";
 import { ContextPanel } from './ContextPanel';
 import { ComposeBar } from './ComposeBar';
 import { DraftCard } from './DraftCard';
 import { CopilotActivityTicker } from '../CopilotActivityTicker';
+import { useSessionStore, CopilotMessage } from '@/lib/session_store';
+import { SessionList } from '../sessions/SessionList';
+import { CopilotContextHandler } from '../CopilotContextHandler';
 
 export function ChatFirstHome() {
+  const { currentSessionId, actions, sessions } = useSessionStore();
+
+  useEffect(() => {
+    // Ensure a session exists if none is active
+    if (!currentSessionId && sessions.length === 0) {
+        actions.createSession('New Session');
+    } else if (!currentSessionId && sessions.length > 0) {
+        actions.switchSession(sessions[0].session_id);
+    }
+  }, [currentSessionId, sessions, actions]);
+
+  if (!currentSessionId) {
+      return (
+          <div className="h-[calc(100vh-64px)] flex items-center justify-center bg-gray-50 text-gray-400 text-sm">
+              Initializing Session...
+          </div>
+      );
+  }
+
+  return (
+    <div className="flex h-[calc(100vh-64px)] overflow-hidden">
+        <SessionList 
+            className="border-r border-gray-200" 
+            onSelectSession={id => actions.switchSession(id)}
+        />
+        
+        <div className="flex-1 flex flex-col min-w-0">
+            {/* 
+                Keying the Provider by session ID forces a remount when switching sessions,
+                ensuring a clean Copilot context (empty history) that we can hydrate.
+            */}
+            <CopilotKit key={currentSessionId} runtimeUrl="/api/copilot">
+                <CopilotContextHandler />
+                <ChatFirstHomeContent sessionId={currentSessionId} />
+            </CopilotKit>
+        </div>
+    </div>
+  );
+}
+
+function ChatFirstHomeContent({ sessionId }: { sessionId: string }) {
   const [isDrafting, setIsDrafting] = useState(false);
   const [draftCount, setDraftCount] = useState(0);
-  const { appendMessage } = useCopilotChat();
+  
+  const { actions, sessions } = useSessionStore();
+  const session = sessions.find(s => s.session_id === sessionId);
+
+  // Initialize chat with session history
+  const { appendMessage, visibleMessages } = useCopilotChat({
+      initialMessages: session?.messages || []
+  });
+  
   const [showContext, setShowContext] = useState(true);
+
+  // Persist messages on change
+  useEffect(() => {
+      if (visibleMessages) {
+          const cleanMessages: CopilotMessage[] = visibleMessages.map(m => {
+              if (m instanceof TextMessageType) {
+                  return {
+                      id: m.id,
+                      role: m.role as 'user' | 'assistant' | 'system',
+                      content: m.content,
+                      createdAt: m.createdAt?.toISOString() || new Date().toISOString()
+                  };
+              }
+              
+              // Fallback for other message types
+              const msg = m as unknown as { id: string, role: string, content?: string, createdAt?: { toISOString: () => string } };
+              return {
+                id: msg.id,
+                role: (msg.role || 'system') as 'user' | 'assistant' | 'system',
+                content: msg.content || '',
+                createdAt: msg.createdAt?.toISOString() || new Date().toISOString()
+              };
+          });
+          actions.setMessages(sessionId, cleanMessages);
+      }
+  }, [visibleMessages, sessionId, actions]);
 
   const handleDraftRequest = () => {
     setIsDrafting(true);
@@ -25,7 +104,7 @@ export function ChatFirstHome() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-64px)] overflow-hidden">
+    <div className="flex flex-1 h-full overflow-hidden">
        {/* Main Chat Area */}
        <div data-testid="home-chat-main" className="flex-1 flex flex-col min-w-0 bg-gray-50/50">
           <div className="flex-1 overflow-hidden relative flex flex-col">
@@ -35,7 +114,7 @@ export function ChatFirstHome() {
                    className="h-full border-none shadow-none bg-transparent"
                    instructions="You are a helpful assistant for the Diviora Console. You help users refine their proposals and clarify their needs. You can see the current artifact context and settings."
                    labels={{
-                      title: "Copilot Chat",
+                      title: session?.title || "Copilot Chat",
                       initial: "Hi! I'm your AI assistant. I'm here to help you draft proposals. Ask me anything or click 'Draft Suggestion' to get started based on your context.",
                       placeholder: "Ask Copilot for help...",
                    }}
