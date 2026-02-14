@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Proposal } from '../lib/types';
 import { useStore } from '../lib/store';
-import Link from 'next/link';
+import { ProposalRenderer } from './components/ProposalRenderer';
 
 export default function Home() {
   const [message, setMessage] = useState('');
@@ -25,6 +25,12 @@ export default function Home() {
     }
 
     setError(null);
+    if (!state.settings.template_id) {
+      setError('Invalid settings: missing template_id');
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -111,103 +117,18 @@ export default function Home() {
         <section className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm h-full flex flex-col">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Latest Proposal</h2>
           {latestProposal ? (
-            <div className="flex-1 space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
-              <div className="border-b border-gray-100 pb-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <h3 className="text-xl font-bold text-gray-900 flex-1">{latestProposal.proposal.title}</h3>
-                  {latestProposal.proposal.template_id && (
-                    <span className="bg-purple-50 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
-                      {latestProposal.proposal.template_id.replace('_', ' ')}
-                    </span>
-                  )}
-                  {latestDecision && (
+            <div className="flex-1 animate-in fade-in slide-in-from-bottom-2 duration-500">
+              <div className="relative">
+                {latestDecision && (
+                  <div className="absolute top-0 right-0 z-10">
                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
                       latestDecision.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
                     }`}>
                       {latestDecision.status}
                     </span>
-                  )}
-                </div>
-                {(!latestProposal.proposal.sections || latestProposal.proposal.sections.length === 0) && (
-                  <p className="text-gray-600 leading-relaxed text-sm">
-                    {latestProposal.proposal.summary}
-                  </p>
+                  </div>
                 )}
-              </div>
-              
-              {latestProposal.proposal.sections && latestProposal.proposal.sections.length > 0 ? (
-                <div className="space-y-6">
-                  {latestProposal.proposal.sections.map((section) => (
-                    <div key={section.key} className="space-y-2">
-                      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">{section.title}</h4>
-                      {Array.isArray(section.content) ? (
-                        <ul className="space-y-1">
-                          {section.content.slice(0, 3).map((item, i) => (
-                            <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
-                              <span className="text-blue-500 mt-1">•</span>
-                              <span className="line-clamp-2">{typeof item === 'string' ? item : JSON.stringify(item)}</span>
-                            </li>
-                          ))}
-                          {section.content.length > 3 && (
-                            <li className="text-[10px] text-gray-400 italic pl-5">
-                              + {section.content.length - 3} more items...
-                            </li>
-                          )}
-                        </ul>
-                      ) : typeof section.content === 'string' ? (
-                        <p className="text-sm text-gray-700 leading-relaxed line-clamp-3">
-                          {section.content}
-                        </p>
-                      ) : (
-                        <pre className="text-[10px] bg-gray-50 p-2 rounded overflow-x-auto font-mono text-gray-600">
-                          {JSON.stringify(section.content, null, 2)}
-                        </pre>
-                      )}
-                    </div>
-                  ))}
-                  <div className="pt-2">
-                    <Link 
-                      href={`/artifacts/${latestProposal.proposal_id}`}
-                      className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 group"
-                    >
-                      View Full Detailed Artifact
-                      <svg className="w-3 h-3 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </Link>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-6">
-                  <div>
-                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Next Actions</h4>
-                    <ul className="space-y-2">
-                      {latestProposal.proposal.next_actions.map((action, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
-                          <span className="text-blue-500 mt-1">•</span>
-                          {action}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  
-                  <div>
-                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 text-amber-600">Risks</h4>
-                    <ul className="space-y-2">
-                      {latestProposal.proposal.risks.map((risk, i) => (
-                        <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
-                          <span className="text-amber-500 mt-1">⚠️</span>
-                          {risk}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              )}
-              
-              <div className="pt-4 mt-auto border-t border-gray-50 flex justify-between items-center text-[10px] text-gray-400">
-                <span>Created: {new Date(latestProposal.created_at).toLocaleString()}</span>
-                <span className="font-mono bg-gray-50 px-2 py-0.5 rounded italic">ID: {latestProposal.proposal_id.substring(0, 12)}</span>
+                <ProposalRenderer proposal={latestProposal} isLatest={true} />
               </div>
             </div>
           ) : (

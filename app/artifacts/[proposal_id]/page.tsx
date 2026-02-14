@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useStore } from '../../../lib/store';
 import EmptyState from '../../components/EmptyState';
 import Link from 'next/link';
+import { ProposalRenderer } from '../../components/ProposalRenderer';
 import { useState } from 'react';
 import { Decision } from '../../../lib/types';
 
@@ -167,86 +168,7 @@ export default function ArtifactDetailPage() {
       )}
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-8 border-b border-gray-100">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
-                Draft Proposal
-              </span>
-              {proposal.proposal.template_id && (
-                 <span className="bg-purple-50 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
-                   {proposal.proposal.template_id.replace('_', ' ')}
-                 </span>
-              )}
-              <span className="text-gray-400 text-sm font-mono">
-                {proposal.proposal_id}
-              </span>
-            </div>
-            {decision && (
-              <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                decision.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-              }`}>
-                {decision.status === 'approved' ? '✓' : '✗'} {decision.status}
-                <span className="text-[10px] opacity-60 ml-2 normal-case font-medium">
-                  {new Date(decision.decided_at).toLocaleString()}
-                </span>
-              </div>
-            )}
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">{proposal.proposal.title}</h1>
-          {!proposal.proposal.sections && (
-            <p className="text-gray-600 text-lg leading-relaxed">{proposal.proposal.summary}</p>
-          )}
-        </div>
-
-        {proposal.proposal.sections ? (
-          <div className="divide-y divide-gray-100 border-b border-gray-100">
-             {proposal.proposal.sections.map((section) => (
-               <div key={section.key} className="p-8">
-                 <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">{section.title}</h3>
-                 {Array.isArray(section.content) ? (
-                   <ul className="space-y-3">
-                     {section.content.map((item, i) => (
-                       <li key={i} className="flex items-start gap-3 text-gray-700">
-                         <span className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-2 flex-shrink-0" />
-                         {item}
-                       </li>
-                     ))}
-                   </ul>
-                 ) : (
-                   <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">{section.content}</p>
-                 )}
-               </div>
-             ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-0 border-b border-gray-100">
-            <div className="p-8 md:border-r border-gray-100">
-              <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Next Actions</h3>
-              <ul className="space-y-3">
-                {proposal.proposal.next_actions.map((action, i) => (
-                  <li key={i} className="flex items-start gap-3 text-gray-700">
-                    <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0 text-xs font-bold">
-                      {i + 1}
-                    </span>
-                    {action}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div className="p-8 bg-amber-50/30">
-              <h3 className="text-sm font-bold text-amber-600/70 uppercase tracking-wider mb-4">Risks & Considerations</h3>
-              <ul className="space-y-3">
-                {proposal.proposal.risks.map((risk, i) => (
-                  <li key={i} className="flex items-start gap-3 text-gray-700">
-                    <span className="mt-1 text-amber-500 flex-shrink-0">⚠️</span>
-                    {risk}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
+        <ProposalRenderer proposal={proposal} />
 
         <div className="p-8 border-b border-gray-100 bg-gray-50/50">
           <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-6">Make a Decision</h3>

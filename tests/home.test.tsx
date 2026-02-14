@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Home from '../app/page';
 import { Proposal } from '../lib/types';
+import * as storeModule from '../lib/store';
 import { StoreProvider } from '../lib/store';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
@@ -170,6 +171,38 @@ describe('Home Page', () => {
       default_step_count: 7,
       template_id: 'bug_triage',
     }));
+  });
+
+  it('fails closed if template_id is missing from settings', async () => {
+    const spy = vi.spyOn(storeModule, 'useStore').mockReturnValue({
+      state: {
+        proposals: [],
+        decisions: [],
+        runs: [],
+        settings: {
+          proposal_style: 'detailed',
+          risk_level: 'medium',
+          default_step_count: 5,
+        }
+      },
+      addProposal: vi.fn(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+
+    renderWithStore(<Home />);
+    
+    const textarea = screen.getByPlaceholderText(/Type your message/i);
+    const submitButton = screen.getByText('Submit');
+
+    fireEvent.change(textarea, { target: { value: 'Test message' } });
+    fireEvent.click(submitButton);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Invalid settings: missing template_id/i)).toBeInTheDocument();
+    });
+
+    expect(fetch).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 
   it('renders sections as primary view when available', async () => {
