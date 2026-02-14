@@ -1,12 +1,16 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import { useStore } from '../../../lib/store';
 import { useSessionStore } from '../../../lib/session_store';
 import { TemplateChecklist } from '../TemplateChecklist';
 import Link from 'next/link';
-import { Pin, PinOff } from 'lucide-react';
+import { Pin, PinOff, Lightbulb } from 'lucide-react';
 
 export function ContextPanel() {
   const { state } = useStore();
   const sessionStore = useSessionStore();
+  const [hints, setHints] = useState<{ missing: string[], hints: string[] } | null>(null);
   
   const currentSessionId = sessionStore.currentSessionId;
   const currentSession = sessionStore.sessions.find(s => s.session_id === currentSessionId);
@@ -14,6 +18,15 @@ export function ContextPanel() {
 
   const latestProposal = state.proposals[0] || null;
   const latestRun = state.runs[0] || null;
+
+  useEffect(() => {
+    const handleHints = (e: Event) => {
+      const customEvent = e as CustomEvent<{ missing: string[], hints: string[] }>;
+      setHints(customEvent.detail);
+    };
+    window.addEventListener('diviora:copilot-hints', handleHints as EventListener);
+    return () => window.removeEventListener('diviora:copilot-hints', handleHints as EventListener);
+  }, []);
 
   // Find latest decision for proposal
   const latestDecision = latestProposal 
@@ -40,6 +53,43 @@ export function ContextPanel() {
 
   return (
     <div data-testid="home-context-panel" className="h-full flex flex-col gap-6 p-4">
+      {/* Copilot Hints Section */}
+      {hints && (
+        <section data-testid="copilot-hints-panel" className="bg-indigo-50 p-3 rounded-lg border border-indigo-100 shadow-sm animate-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Lightbulb size={12} className="text-indigo-600" />
+              <h3 className="text-[10px] font-bold text-indigo-700 uppercase tracking-widest">Copilot Hints</h3>
+            </div>
+            <button onClick={() => setHints(null)} className="text-indigo-300 hover:text-indigo-600">
+               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+               </svg>
+            </button>
+          </div>
+          <div className="space-y-2">
+            {hints.missing.length > 0 && (
+              <div>
+                <span className="text-[9px] font-bold text-indigo-400 uppercase block mb-1">Missing</span>
+                <div className="flex flex-wrap gap-1">
+                  {hints.missing.map((m, i) => (
+                    <span key={i} className="text-[9px] bg-white text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100">{m}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="space-y-1">
+              {hints.hints.map((hint, i) => (
+                <p key={i} className="text-[10px] text-indigo-800 leading-tight flex gap-1.5">
+                  <span className="text-indigo-400">•</span>
+                  {hint}
+                </p>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Pinned Context Section */}
       {(pinned.proposal_id || pinned.run_id) && (
         <section className="bg-amber-50 p-3 rounded-lg border border-amber-200 shadow-sm space-y-2">
@@ -49,46 +99,43 @@ export function ContextPanel() {
              </div>
              
              {pinned.proposal_id && latestProposal && pinned.proposal_id === latestProposal.proposal_id && (
-                 <div className="flex justify-between items-center text-xs bg-white/50 p-1.5 rounded border border-amber-100">
-                    <span className="text-amber-900 truncate font-medium flex-1 mr-2" title={latestProposal.proposal.title}>
-                        Prop: {latestProposal.proposal.title}
-                    </span>
-                    <button 
-                        onClick={() => togglePinProposal(pinned.proposal_id!)} 
-                        className="text-amber-500 hover:text-amber-800 p-1"
-                    >
-                        <PinOff size={11} />
-                    </button>
-                 </div>
+                  <div className="flex justify-between items-center text-xs bg-white/50 p-1.5 rounded border border-amber-100">
+                     <span className="text-amber-900 truncate font-medium flex-1 mr-2" title={latestProposal.proposal.title}>
+                         Prop: {latestProposal.proposal.title}
+                     </span>
+                     <button 
+                         onClick={() => togglePinProposal(pinned.proposal_id!)} 
+                         className="text-amber-500 hover:text-amber-800 p-1"
+                     >
+                         <PinOff size={11} />
+                     </button>
+                  </div>
              )}
-             {/* Note: If pinned proposal is NOT the latest, we might not have its title easily in this simple view unless we search all proposals. 
-                 For MVP, we only show details if it matches latest or generic "Pinned Proposal". 
-                 But let's attempt to find it if possible, or just show ID. */}
              {pinned.proposal_id && (!latestProposal || pinned.proposal_id !== latestProposal.proposal_id) && (
-                 <div className="flex justify-between items-center text-xs bg-white/50 p-1.5 rounded border border-amber-100">
-                     <span className="text-amber-900 font-mono text-[10px]">Prop: {pinned.proposal_id.slice(0,8)}...</span>
-                     <button onClick={() => togglePinProposal(pinned.proposal_id!)} className="text-amber-500 hover:text-amber-800 p-1"><PinOff size={11} /></button>
-                 </div>
+                  <div className="flex justify-between items-center text-xs bg-white/50 p-1.5 rounded border border-amber-100">
+                      <span className="text-amber-900 font-mono text-[10px]">Prop: {pinned.proposal_id.slice(0,8)}...</span>
+                      <button onClick={() => togglePinProposal(pinned.proposal_id!)} className="text-amber-500 hover:text-amber-800 p-1"><PinOff size={11} /></button>
+                  </div>
              )}
 
               {pinned.run_id && latestRun && pinned.run_id === latestRun.run_id && (
-                 <div className="flex justify-between items-center text-xs bg-white/50 p-1.5 rounded border border-amber-100">
-                    <span className="text-amber-900 truncate font-medium flex-1 mr-2" title={latestRun.plan.objective}>
-                        Run: {latestRun.plan.objective}
-                    </span>
-                    <button 
-                        onClick={() => togglePinRun(pinned.run_id!)} 
-                        className="text-amber-500 hover:text-amber-800 p-1"
-                    >
-                        <PinOff size={11} />
-                    </button>
-                 </div>
+                  <div className="flex justify-between items-center text-xs bg-white/50 p-1.5 rounded border border-amber-100">
+                     <span className="text-amber-900 truncate font-medium flex-1 mr-2" title={latestRun.plan.objective}>
+                         Run: {latestRun.plan.objective}
+                     </span>
+                     <button 
+                         onClick={() => togglePinRun(pinned.run_id!)} 
+                         className="text-amber-500 hover:text-amber-800 p-1"
+                     >
+                         <PinOff size={11} />
+                     </button>
+                  </div>
              )}
               {pinned.run_id && (!latestRun || pinned.run_id !== latestRun.run_id) && (
-                 <div className="flex justify-between items-center text-xs bg-white/50 p-1.5 rounded border border-amber-100">
-                    <span className="text-amber-900 font-mono text-[10px]">Run: {pinned.run_id.slice(0,8)}...</span>
-                     <button onClick={() => togglePinRun(pinned.run_id!)} className="text-amber-500 hover:text-amber-800 p-1"><PinOff size={11} /></button>
-                 </div>
+                  <div className="flex justify-between items-center text-xs bg-white/50 p-1.5 rounded border border-amber-100">
+                     <span className="text-amber-900 font-mono text-[10px]">Run: {pinned.run_id.slice(0,8)}...</span>
+                      <button onClick={() => togglePinRun(pinned.run_id!)} className="text-amber-500 hover:text-amber-800 p-1"><PinOff size={11} /></button>
+                  </div>
              )}
         </section>
       )}
@@ -138,7 +185,7 @@ export function ContextPanel() {
         {latestProposal ? (
           <div className="relative group">
               <Link 
-                href={`/proposal/${latestProposal.proposal_id}`} 
+                href={`/artifacts/${latestProposal.proposal_id}`} 
                 data-testid="latest-proposal-link"
                 className="block p-3 bg-blue-50 border border-blue-100 rounded hover:bg-blue-100 transition mr-8"
               >
@@ -180,7 +227,7 @@ export function ContextPanel() {
 
         {latestRun && (
            <div className="relative group">
-               <Link href={`/run/${latestRun.run_id}`} className="block p-3 bg-purple-50 border border-purple-100 rounded hover:bg-purple-100 transition mr-8">
+               <Link href={`/runs/${latestRun.run_id}`} className="block p-3 bg-purple-50 border border-purple-100 rounded hover:bg-purple-100 transition mr-8">
                  <div className="flex justify-between items-start mb-1">
                    <span className="text-[10px] font-bold text-purple-600 uppercase">RUN PLAN</span>
                     <span className="text-[9px] px-1.5 py-0.5 rounded uppercase font-bold bg-gray-200 text-gray-700">
