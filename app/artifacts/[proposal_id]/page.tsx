@@ -121,6 +121,7 @@ export default function ArtifactDetailPage() {
           ) : (
             <button
               onClick={handleCreateRun}
+              data-testid="create-run-plan"
               disabled={decision?.status !== 'approved'}
               className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all ${
                 decision?.status === 'approved' 
@@ -178,6 +179,7 @@ export default function ArtifactDetailPage() {
               className="w-full p-3 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all mb-4"
               rows={3}
               placeholder="Add reasoning for your decision..."
+              data-testid="decision-note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
             />
@@ -189,6 +191,7 @@ export default function ArtifactDetailPage() {
             <div className="flex gap-4">
               <button
                 onClick={() => handleDecision('approved')}
+                data-testid="approve-button"
                 disabled={decision?.status === 'approved'}
                 className={`flex-1 py-3 px-6 rounded-lg font-bold text-white transition-all shadow-md active:transform active:scale-95 ${
                   decision?.status === 'approved' 

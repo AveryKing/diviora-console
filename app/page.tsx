@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Proposal } from '../lib/types';
 import { useStore } from '../lib/store';
 import { ProposalRenderer } from './components/ProposalRenderer';
@@ -8,6 +8,15 @@ import { ProposalRenderer } from './components/ProposalRenderer';
 export default function Home() {
   const [message, setMessage] = useState('');
   const { state, addProposal } = useStore();
+
+  useEffect(() => {
+    const handleInsert = (e: Event) => {
+      const customEvent = e as CustomEvent<{ message: string }>;
+      setMessage(customEvent.detail.message);
+    };
+    window.addEventListener('diviora:insert-input', handleInsert as EventListener);
+    return () => window.removeEventListener('diviora:insert-input', handleInsert as EventListener);
+  }, []);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,6 +85,7 @@ export default function Home() {
                 error ? 'border-red-300' : 'border-gray-200'
               }`}
               placeholder="Type your message to Diviora Hub..."
+              data-testid="chat-input"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               disabled={isLoading}
@@ -94,6 +104,7 @@ export default function Home() {
                   : 'bg-blue-600 text-white hover:bg-blue-700 hover:shadow active:transform active:scale-95'
               }`}
               type="submit"
+              data-testid="chat-submit"
               disabled={isLoading}
             >
               {isLoading ? (
@@ -128,7 +139,9 @@ export default function Home() {
                     </span>
                   </div>
                 )}
-                <ProposalRenderer proposal={latestProposal} isLatest={true} />
+                <div data-testid="latest-proposal-container">
+                  <ProposalRenderer proposal={latestProposal} isLatest={true} />
+                </div>
               </div>
             </div>
           ) : (
@@ -151,7 +164,7 @@ export default function Home() {
                 {history.map((item, i) => {
                   const itemDecision = state.decisions.find(d => d.proposal_id === item.proposal_id);
                   return (
-                    <li key={i} className="pl-8 relative group animate-in slide-in-from-left-2 duration-300">
+                    <li key={i} data-testid="timeline-item" className="pl-8 relative group animate-in slide-in-from-left-2 duration-300">
                       <div className="absolute left-[-24px] top-1.5 w-3 h-3 rounded-full bg-blue-100 border-2 border-blue-500 group-first:bg-blue-500"></div>
                       <div>
                         <div className="flex items-center justify-between">

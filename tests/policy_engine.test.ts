@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { evaluatePolicy, ActionType } from '../lib/policy';
+import { evaluatePolicy } from '../lib/policy';
 import { Settings, Proposal, Decision, RunPlan } from '../lib/types';
 
 describe('Policy Engine (Issue #13)', () => {

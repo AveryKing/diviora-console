@@ -23,7 +23,7 @@ export default function Header() {
           <div className="flex items-center">
             <h1 className="text-xl font-bold text-gray-900">Diviora Console</h1>
           </div>
-          <nav className="flex space-x-8">
+          <nav className="flex space-x-8 items-center">
             {navLinks.map((link) => {
               const isActive = pathname === link.href
               return (
@@ -40,6 +40,19 @@ export default function Header() {
                 </Link>
               )
             })}
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('diviora:toggle-copilot'))}
+              className="ml-4 p-2 text-gray-400 hover:text-blue-600 transition-colors relative group"
+              title="Toggle Copilot"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+              <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+              </span>
+            </button>
           </nav>
         </div>
       </div>

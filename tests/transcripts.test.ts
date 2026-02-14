@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { StoreProvider, useStore } from '../lib/store';
-import { Proposal, Decision, RunPlan, Settings } from '../lib/types';
+import { Proposal, Decision, Settings } from '../lib/types';
 import React from 'react';
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const mockSettings: Settings = {
   schema_version: 1,
   proposal_style: 'detailed',

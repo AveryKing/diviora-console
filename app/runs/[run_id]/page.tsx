@@ -91,12 +91,12 @@ export default function RunDetailPage() {
       const s2 = getStats(t2);
 
       return (
-          <div className="grid grid-cols-2 gap-4 text-xs font-mono bg-gray-100 p-4 rounded mb-4">
+          <div data-testid="diff-summary" className="grid grid-cols-2 gap-4 text-xs font-mono bg-gray-100 p-4 rounded mb-4">
               <div className="space-y-2">
                  <div className="font-bold underline text-gray-500">Attempt {t1.attempt} ({t1.scenario_id})</div>
                  <div>ERROR: {s1.error}</div>
                  <div>WARN:  {s1.warn}</div>
-                 {s1.firstError && <div className="text-red-600 truncate" title={s1.firstError}>{s1.firstError}</div>}
+                 {s1.firstError && <div data-testid="diff-error-line" className="text-red-600 truncate" title={s1.firstError}>{s1.firstError}</div>}
               </div>
               <div className="space-y-2 border-l border-gray-300 pl-4">
                  <div className="font-bold underline text-gray-500">Attempt {t2.attempt} ({t2.scenario_id})</div>
@@ -176,7 +176,7 @@ export default function RunDetailPage() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
             <div className="flex items-center gap-3">
               {outcome ? (
-                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${outcome.color}`}>
+                   <span data-testid="outcome-badge" className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${outcome.color}`}>
                      {outcome.label}
                    </span>
               ) : (
@@ -195,6 +195,7 @@ export default function RunDetailPage() {
                  {/* Scenario Selector */}
                  <select 
                     value={selectedScenario}
+                    data-testid="scenario-selector"
                     onChange={(e) => setSelectedScenario(e.target.value as 'happy_path' | 'flaky_inputs' | 'rate_limited' | 'validation_error')}
                     className="p-2 border border-gray-300 rounded text-xs bg-white text-gray-700 font-mono"
                  >
@@ -206,6 +207,7 @@ export default function RunDetailPage() {
 
                 <button
                     onClick={handleGenerateTranscript}
+                    data-testid="generate-transcript-button"
                     className="px-4 py-2 bg-gray-900 text-white text-sm font-bold rounded-lg hover:bg-gray-800 shadow-sm active:transform active:scale-95 transition-all flex items-center gap-2"
                 >
                     {currentTranscript ? 'Rerun Scenario' : 'Generate Transcript'}
@@ -269,6 +271,7 @@ export default function RunDetailPage() {
                     <label className="flex items-center gap-2 cursor-pointer">
                         <input 
                             type="checkbox" 
+                            data-testid="diff-mode-toggle"
                             checked={diffMode}
                             onChange={(e) => setDiffMode(e.target.checked)}
                             className="rounded text-blue-600"
@@ -278,6 +281,7 @@ export default function RunDetailPage() {
                     {diffMode && (
                          <select 
                             value={diffTargetId || ''}
+                            data-testid="diff-target-selector"
                             onChange={(e) => setDiffTargetId(e.target.value)}
                             className="p-1 border border-gray-300 rounded text-xs text-gray-600 bg-white"
                         >

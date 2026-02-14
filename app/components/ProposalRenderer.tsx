@@ -21,7 +21,7 @@ export function ProposalRenderer({ proposal, isLatest = false }: ProposalRendere
             {data.title}
           </h3>
           {data.template_id && (
-            <span className="bg-purple-50 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+            <span data-testid="proposal-template-badge" className="bg-purple-50 text-purple-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
               {data.template_id.replace('_', ' ')}
             </span>
           )}
@@ -34,10 +34,10 @@ export function ProposalRenderer({ proposal, isLatest = false }: ProposalRendere
       </div>
 
       {hasSections ? (
-        <div className={isLatest ? "space-y-6" : "divide-y divide-gray-100 border-b border-gray-100"}>
+        <div data-testid="proposal-sections" className={isLatest ? "space-y-6" : "divide-y divide-gray-100 border-b border-gray-100"}>
           {data.sections!.map((section) => (
-            <div key={section.key} className={isLatest ? "space-y-2" : "p-8"}>
-              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+            <div key={section.key} data-testid={`section-${section.key}`} className={isLatest ? "space-y-2" : "p-8"}>
+              <h4 data-testid="section-title" className="text-xs font-bold text-gray-400 uppercase tracking-wider">
                 {section.title}
               </h4>
               {Array.isArray(section.content) ? (
