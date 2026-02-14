@@ -16,7 +16,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { message, settings } = result.data;
+    const { message: rawMessage, settings } = result.data;
+    const message = rawMessage.trim().replace(/\r\n/g, '\n');
 
     // Use settings or defaults
     const proposalStyle = settings?.proposal_style || 'detailed';
@@ -43,7 +44,8 @@ export async function POST(request: NextRequest) {
     const sections = generateProposalSections(templateId, message, fullSettings);
 
     // Map sections to legacy fields for compatibility
-    const title = `Proposal: ${message.substring(0, 30)}${message.length > 30 ? '...' : ''}`;
+    const displayMessage = message.replace(/\n/g, ' ');
+    const title = `Proposal: ${displayMessage.substring(0, 30)}${displayMessage.length > 30 ? '...' : ''}`;
     
     let summary = sections[0].content;
     if (Array.isArray(summary)) summary = summary.join(" ");

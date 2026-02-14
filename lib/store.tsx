@@ -5,7 +5,7 @@ import {
   Proposal, 
   Decision, 
   RunPlan, 
-  RunTranscript, RunTranscriptSchema,
+  RunTranscript, 
   Settings, SettingsSchema,
   SnapshotV2, SnapshotV2Schema,
   AppMetadata, AppMetadataSchema,

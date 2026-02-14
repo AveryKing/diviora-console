@@ -96,6 +96,7 @@ export default function SettingsPage() {
             <div className="md:col-span-2 space-y-3">
               <select
                 name="template_id"
+                data-testid="settings-template"
                 value={settings.template_id || 'generic'}
                 onChange={handleChange}
                 className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
@@ -124,7 +125,7 @@ export default function SettingsPage() {
             </div>
             <div className="md:col-span-2 flex gap-4">
               {['concise', 'detailed'].map((style) => (
-                <label key={style} className={`flex-1 flex flex-col items-center p-4 border rounded-xl cursor-pointer transition-all ${
+                <label key={style} data-testid={`settings-style-${style}`} className={`flex-1 flex flex-col items-center p-4 border rounded-xl cursor-pointer transition-all ${
                   settings.proposal_style === style 
                     ? 'border-blue-500 bg-blue-50/50 shadow-sm ring-1 ring-blue-500' 
                     : 'border-gray-200 hover:border-gray-300'
@@ -154,6 +155,7 @@ export default function SettingsPage() {
             <div className="md:col-span-2">
               <select
                 name="risk_level"
+                data-testid="settings-risk"
                 value={settings.risk_level}
                 onChange={handleChange}
                 className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
@@ -175,7 +177,7 @@ export default function SettingsPage() {
             </div>
             <div className="md:col-span-2 flex gap-4">
               {[3, 5, 7].map((num) => (
-                <label key={num} className={`flex-1 flex flex-col items-center p-3 border rounded-xl cursor-pointer transition-all ${
+                <label key={num} data-testid={`settings-steps-${num}`} className={`flex-1 flex flex-col items-center p-3 border rounded-xl cursor-pointer transition-all ${
                   settings.default_step_count === num 
                     ? 'border-blue-500 bg-blue-50/50 shadow-sm ring-1 ring-blue-500' 
                     : 'border-gray-200 hover:border-gray-300'
@@ -206,6 +208,7 @@ export default function SettingsPage() {
               {['compact', 'expanded'].map((mode) => (
                 <button
                   key={mode}
+                  data-testid={`settings-timeline-${mode}`}
                   onClick={() => updateSettings({ timeline_mode: mode as 'compact' | 'expanded' })}
                   className={`flex-1 p-3 text-sm font-medium border rounded-xl transition-all ${
                     settings.timeline_mode === mode 
@@ -265,6 +268,7 @@ export default function SettingsPage() {
             </div>
             <button
               onClick={resetAllData}
+              data-testid="reset-all-data"
               className="px-6 py-3 bg-red-600 text-white text-sm font-bold rounded-lg hover:bg-red-700 shadow-sm active:transform active:scale-95 transition-all"
             >
               Reset All Demo Data
