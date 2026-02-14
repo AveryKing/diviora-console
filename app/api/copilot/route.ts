@@ -7,6 +7,13 @@ import OpenAI from "openai";
 import { NextRequest } from "next/server";
 
 export const POST = async (req: NextRequest) => {
+  if (process.env.COPILOT_DISABLED_FOR_E2E === '1' || req.headers.get('x-playwright-test') === 'true') {
+    return new Response(JSON.stringify({ error: "Copilot disabled for E2E tests" }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
