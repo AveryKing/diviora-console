@@ -2,7 +2,16 @@ import { expect, type Page } from '@playwright/test';
 
 export async function waitForComposeReady(page: Page): Promise<void> {
   const textarea = page.getByTestId('home-compose-textarea');
-  await expect(textarea).toBeVisible({ timeout: 30000 });
+  try {
+    await expect(textarea).toBeVisible({ timeout: 5000 });
+  } catch {
+    // Fallback: if no active session is selected yet, create one explicitly.
+    const createSession = page.getByTestId('session-new');
+    if (await createSession.isVisible().catch(() => false)) {
+      await createSession.click();
+    }
+    await expect(textarea).toBeVisible({ timeout: 30000 });
+  }
 
   // Stabilize around transient remounts before interaction.
   await expect
