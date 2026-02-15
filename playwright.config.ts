@@ -1,5 +1,12 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const E2E_PORT = Number(process.env.PLAYWRIGHT_WEB_PORT ?? '3100');
+const E2E_BASE_URL = `http://localhost:${E2E_PORT}`;
+const AUTH_TOKEN =
+  process.env.DIVIORA_CONSOLE_AUTH_TOKEN ??
+  process.env.NEXT_PUBLIC_DIVIORA_CONSOLE_AUTH_TOKEN ??
+  'test-token';
+
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
@@ -19,7 +26,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'http://localhost:3000',
+    baseURL: E2E_BASE_URL,
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -40,9 +47,18 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: process.env.CI ? 'npm run start' : 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
+    command: process.env.CI
+      ? `npx next start --port ${E2E_PORT}`
+      : `npx next dev --port ${E2E_PORT}`,
+    url: `${E2E_BASE_URL}/api/health`,
+    env: {
+      ...process.env,
+      PORT: String(E2E_PORT),
+      DIVIORA_CONSOLE_AUTH_TOKEN: AUTH_TOKEN,
+      NEXT_PUBLIC_DIVIORA_CONSOLE_AUTH_TOKEN: AUTH_TOKEN,
+      OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? 'test-key',
+    },
+    reuseExistingServer: false,
     timeout: 120_000,
   },
 });

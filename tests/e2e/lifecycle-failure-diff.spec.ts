@@ -8,15 +8,20 @@ test.describe('Core Lifecycle - Failure & Diff', () => {
     await page.goto('/settings');
     page.on('dialog', dialog => dialog.accept());
     await page.click('[data-testid="reset-all-data"]');
+    await page.goto('/');
+    await expect(page.getByText('No proposals yet')).toBeVisible({ timeout: 15_000 });
     
     // 2. Setup initial state: Proposal -> Approve -> Run Plan
-    await page.goto('/');
     await expect(page.getByTestId('home-compose-textarea')).toBeVisible({ timeout: 60_000 });
     await page.fill('[data-testid="home-compose-textarea"]', 'Connectivity issues in Region East.');
     await expect(page.getByTestId('home-compose-submit')).toBeEnabled();
     await page.click('[data-testid="home-compose-submit"]');
-    
-    await expect(page.locator('[data-testid="latest-proposal-link"]')).toBeVisible({ timeout: 15_000 });
+
+    const latestProposalLink = page.locator('[data-testid="latest-proposal-link"]');
+    await expect
+      .poll(async () => await latestProposalLink.count(), { timeout: 30_000 })
+      .toBeGreaterThan(0);
+    await expect(latestProposalLink).toBeVisible({ timeout: 15_000 });
     await page.click('[data-testid="latest-proposal-link"]');
     
     await page.click('[data-testid="approve-button"]');
