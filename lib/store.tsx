@@ -7,7 +7,8 @@ import {
   RunPlan, 
   RunTranscript, 
   Settings, SettingsSchema,
-  SnapshotV2, SnapshotV2Schema,
+  SnapshotV3, SnapshotV3Schema,
+  SnapshotTranscript,
   AppMetadata, AppMetadataSchema,
   ProposalsCollectionSchema,
   DecisionsCollectionSchema,
@@ -177,7 +178,7 @@ const StoreContext = createContext<{
   generateTranscript: (run_id: string, scenarioId?: 'happy_path' | 'flaky_inputs' | 'rate_limited' | 'validation_error', seed?: string) => RunTranscript;
   updateSettings: (partial: Partial<Settings>) => void;
   resetAllData: () => void;
-  exportSnapshot: () => SnapshotV2;
+  exportSnapshot: () => SnapshotV3;
   importSnapshot: (snapshot: unknown) => { ok: true } | { ok: false, error: string };
 } | undefined>(undefined);
 
@@ -500,11 +501,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return transcript;
   };
 
-  const exportSnapshot = (): SnapshotV2 => {
+  const exportSnapshot = (): SnapshotV3 => {
     const now = new Date().toISOString();
     dispatch({ type: 'UPDATE_METADATA', payload: { last_exported_at: now } });
+
+    const runProposalMap = new Map(state.runs.map((run) => [run.run_id, run.proposal_id]));
+    const snapshotTranscripts: SnapshotTranscript[] = state.transcripts.map((transcript) => {
+      const proposalId = runProposalMap.get(transcript.run_id);
+      if (!proposalId) {
+        throw new Error(`Snapshot export failed: transcript ${transcript.transcript_id} refers to missing run ${transcript.run_id}`);
+      }
+      return {
+        ...transcript,
+        proposal_id: proposalId,
+      };
+    });
+
     return {
-      snapshot_version: 2,
+      snapshot_version: 3,
       exported_at: now,
       app_version: "0.1.0",
       state_schema_versions: {
@@ -512,11 +526,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         proposals: 1,
         decisions: 1,
         runs: 1,
+        transcripts: 1,
       },
       settings: state.settings,
       proposals: state.proposals,
       decisions: state.decisions,
       runs: state.runs,
+      transcripts: snapshotTranscripts,
     };
   };
 
@@ -524,7 +540,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try {
       const snapshot = migrateSnapshot(payload);
       
-      const result = SnapshotV2Schema.safeParse(snapshot);
+      const result = SnapshotV3Schema.safeParse(snapshot);
       if (!result.success) {
         return { ok: false, error: `Invalid snapshot schema: ${result.error.issues[0].message}` };
       }
@@ -543,6 +559,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      const runById = new Map(snapshot.runs.map((run) => [run.run_id, run]));
+      for (const t of snapshot.transcripts) {
+        const run = runById.get(t.run_id);
+        if (!run) {
+          return { ok: false, error: `Referential integrity failed: Transcript ${t.transcript_id} refers to missing run ${t.run_id}` };
+        }
+        if (!proposalIds.has(t.proposal_id)) {
+          return { ok: false, error: `Referential integrity failed: Transcript ${t.transcript_id} refers to missing proposal ${t.proposal_id}` };
+        }
+        if (run.proposal_id !== t.proposal_id) {
+          return { ok: false, error: `Referential integrity failed: Transcript ${t.transcript_id} proposal ${t.proposal_id} does not match run ${t.run_id} proposal ${run.proposal_id}` };
+        }
+      }
+
       const now = new Date().toISOString();
       const updatedMetadata: AppMetadata = {
         ...state.metadata,
@@ -556,7 +586,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           proposals: snapshot.proposals,
           decisions: snapshot.decisions,
           runs: snapshot.runs,
-          transcripts: [], // Snapshots don't have transcripts yet in V2, so empty
+          transcripts: snapshot.transcripts.map((transcript) => ({
+            transcript_id: transcript.transcript_id,
+            run_id: transcript.run_id,
+            created_at: transcript.created_at,
+            status: transcript.status,
+            scenario_id: transcript.scenario_id,
+            attempt: transcript.attempt,
+            events: transcript.events,
+          })),
           settings: snapshot.settings,
           metadata: updatedMetadata
         }
