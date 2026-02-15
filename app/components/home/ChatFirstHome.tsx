@@ -39,13 +39,14 @@ export function ChatFirstHome() {
     }).persist;
     if (!persistApi) return;
 
-    // Check initial state
-    if (persistApi.hasHydrated()) return;
-
-    // Wait for hydration callback
-    return persistApi.onFinishHydration(() => {
+    // Handle race conditions where hydration may complete before callback registration.
+    const unsubscribe = persistApi.onFinishHydration(() => {
       setIsHydrated(true);
     });
+    if (persistApi.hasHydrated()) {
+      queueMicrotask(() => setIsHydrated(true));
+    }
+    return unsubscribe;
   }, []);
 
   // Ensure an active session exists
