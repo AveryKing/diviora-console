@@ -13,6 +13,9 @@ import { CopilotActivityTicker } from '../CopilotActivityTicker';
 import { CopilotMessage, useSessionStore } from '@/lib/session_store';
 import { SessionList } from '../sessions/SessionList';
 import { CopilotContextHandler } from '../CopilotContextHandler';
+import { CopilotErrorUX } from '../copilot/CopilotErrorUX';
+import { emitCopilotHttpError } from '@/lib/copilot_error_bus';
+import { parseCopilotHttpErrorSync } from '@/lib/copilot_http_error';
 
 export function ChatFirstHome() {
   const currentSessionId = useSessionStore(state => state.currentSessionId);
@@ -53,6 +56,7 @@ export function ChatFirstHome() {
                   threadId={currentSessionId || undefined}
                   headers={headers}
                 >
+                    <CopilotErrorUX />
                     <CopilotContextHandler />
                     {currentSessionId ? (
                         <ChatFirstHomeContent key={currentSessionId} sessionId={currentSessionId} />
@@ -189,7 +193,13 @@ function ChatFirstHomeContent({ sessionId }: { sessionId: string }) {
           content: 'Draft a suggested next message for me based on the current context. Use the draftNextMessage action to provide it.',
       }));
     } catch (err) {
-      setChatError(err instanceof Error ? err.message : 'Failed to send draft request.');
+      const parsed = parseCopilotHttpErrorSync(err);
+      if (parsed) {
+        emitCopilotHttpError(parsed);
+      } else {
+        setChatError(err instanceof Error ? err.message : 'Failed to send draft request.');
+      }
+      setIsDrafting(false);
     }
   }, [appendMessage]);
 
