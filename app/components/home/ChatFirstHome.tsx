@@ -14,38 +14,19 @@ import { CopilotMessage, useSessionStore } from '@/lib/session_store';
 import { SessionList } from '../sessions/SessionList';
 import { CopilotContextHandler } from '../CopilotContextHandler';
 
+type SessionStorePersistApi = {
+  persist?: {
+    hasHydrated: () => boolean;
+  };
+};
+
 export function ChatFirstHome() {
   const currentSessionId = useSessionStore(state => state.currentSessionId);
   const hasSessions = useSessionStore(state => state.sessions.length > 0);
+  const firstSessionId = useSessionStore(state => state.sessions[0]?.session_id ?? null);
+  const hydratedFromStore = useSessionStore(state => state.hydrated);
+  const isHydrated = hydratedFromStore || ((useSessionStore as unknown as SessionStorePersistApi).persist?.hasHydrated() ?? false);
   const actions = useSessionStore(state => state.actions);
-
-  const [isHydrated, setIsHydrated] = useState(() => {
-    const persistApi = (useSessionStore as unknown as {
-      persist?: {
-        hasHydrated: () => boolean;
-      };
-    }).persist;
-    return persistApi ? persistApi.hasHydrated() : true;
-  });
-
-  // Sync hydration state from Zustand persist
-  useEffect(() => {
-    const persistApi = (useSessionStore as unknown as {
-      persist?: {
-        hasHydrated: () => boolean;
-        onFinishHydration: (cb: () => void) => () => void;
-      };
-    }).persist;
-    if (!persistApi) return;
-
-    // Check initial state
-    if (persistApi.hasHydrated()) return;
-
-    // Wait for hydration callback
-    return persistApi.onFinishHydration(() => {
-      setIsHydrated(true);
-    });
-  }, []);
 
   // Ensure an active session exists
   useEffect(() => {
@@ -53,14 +34,12 @@ export function ChatFirstHome() {
 
     if (!currentSessionId) {
         if (hasSessions) {
-            // Need to find first session ID but don't want to depend on 'sessions' array
-            const firstSession = useSessionStore.getState().sessions[0];
-            if (firstSession) actions.switchSession(firstSession.session_id);
+            if (firstSessionId) actions.switchSession(firstSessionId);
         } else {
             actions.createSession('New Session');
         }
     }
-  }, [currentSessionId, hasSessions, actions, isHydrated]);
+  }, [currentSessionId, hasSessions, firstSessionId, actions, isHydrated]);
 
   return (
     <div className="flex h-[calc(100vh-64px)] overflow-hidden">
@@ -73,13 +52,12 @@ export function ChatFirstHome() {
                 </div>
             ) : (
                 <CopilotKit
-                  key={currentSessionId}
                   runtimeUrl="/api/copilot"
                   threadId={currentSessionId || undefined}
                 >
                     <CopilotContextHandler />
                     {currentSessionId ? (
-                        <ChatFirstHomeContent sessionId={currentSessionId} />
+                        <ChatFirstHomeContent key={currentSessionId} sessionId={currentSessionId} />
                     ) : (
                         <div className="h-full flex items-center justify-center bg-gray-50 text-gray-400 text-sm">
                             Loading Session...

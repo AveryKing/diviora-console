@@ -81,6 +81,13 @@ describe('ChatFirstHome', () => {
       updated_at: new Date().toISOString()
   };
 
+  let mockSessionStoreState: {
+    currentSessionId: string | null;
+    sessions: typeof mockSession[];
+    hydrated: boolean;
+    actions: typeof mockSessionActions;
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     (useStore as unknown as { mockReturnValue: (val: unknown) => void }).mockReturnValue({
@@ -89,10 +96,33 @@ describe('ChatFirstHome', () => {
     });
     
     (useSessionStore as unknown as { mockReturnValue: (val: unknown) => void }).mockReturnValue({
-        currentSessionId: 'sess_1',
-        sessions: [mockSession],
-        actions: mockSessionActions
+      currentSessionId: 'sess_1',
+      sessions: [mockSession],
+      hydrated: true,
+      actions: mockSessionActions
     });
+
+    mockSessionStoreState = {
+      currentSessionId: 'sess_1',
+      sessions: [mockSession],
+      hydrated: true,
+      actions: mockSessionActions,
+    };
+
+    const mockedSessionStore = useSessionStore as unknown as {
+      mockImplementation: (fn: (selector?: (state: typeof mockSessionStoreState) => unknown) => unknown) => void;
+      persist?: { hasHydrated: () => boolean };
+    };
+
+    mockedSessionStore.mockImplementation((selector?: (state: typeof mockSessionStoreState) => unknown) => {
+      if (selector) {
+        return selector(mockSessionStoreState);
+      }
+      return mockSessionStoreState;
+    });
+    mockedSessionStore.persist = {
+      hasHydrated: () => mockSessionStoreState.hydrated,
+    };
 
     // Mock fetch
     global.fetch = vi.fn();
@@ -150,5 +180,27 @@ describe('ChatFirstHome', () => {
     });
 
     expect(mockAddProposal).toHaveBeenCalled();
+  });
+
+  it('initializes deterministically when hydration flips to ready', async () => {
+    mockSessionStoreState = {
+      ...mockSessionStoreState,
+      currentSessionId: null,
+      hydrated: false,
+    };
+
+    const { rerender } = render(<ChatFirstHome />);
+    expect(screen.getByText('Initializing Application...')).toBeInTheDocument();
+
+    mockSessionStoreState = {
+      ...mockSessionStoreState,
+      hydrated: true,
+    };
+
+    rerender(<ChatFirstHome />);
+
+    await waitFor(() => {
+      expect(mockSessionActions.switchSession).toHaveBeenCalledWith('sess_1');
+    });
   });
 });
