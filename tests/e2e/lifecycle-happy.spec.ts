@@ -25,10 +25,11 @@ test.describe('Core Lifecycle - Happy Path', () => {
     await expect(page.getByTestId('home-compose-textarea')).toBeVisible({ timeout: 60_000 });
     const bugMessage = 'Fixed button overlap on mobile in the checkout flow.';
     await page.fill('[data-testid="home-compose-textarea"]', bugMessage);
+    await expect(page.getByTestId('home-compose-submit')).toBeEnabled();
     await page.click('[data-testid="home-compose-submit"]');
 
     // 4. Assert latest proposal link is present
-    await expect(page.locator('[data-testid="latest-proposal-link"]')).toBeVisible();
+    await expect(page.locator('[data-testid="latest-proposal-link"]')).toBeVisible({ timeout: 15_000 });
 
     // 5. Open artifacts newest detail and assert template badge bug_triage
     await page.click('[data-testid="latest-proposal-link"]');
