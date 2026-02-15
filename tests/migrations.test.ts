@@ -41,18 +41,20 @@ describe('Migrations Logic (Issue #9)', () => {
     runs: [],
   };
 
-  it('migrates SnapshotV1 to SnapshotV2', () => {
-    const v2 = migrateSnapshot(v1Snapshot);
-    expect(v2.snapshot_version).toBe(2);
-    expect(v2.state_schema_versions).toBeDefined();
-    expect(v2.state_schema_versions.settings).toBe(1);
-    expect(v2.app_version).toBe('0.1.0');
+  it('migrates SnapshotV1 to SnapshotV3', () => {
+    const v3 = migrateSnapshot(v1Snapshot);
+    expect(v3.snapshot_version).toBe(3);
+    expect(v3.state_schema_versions).toBeDefined();
+    expect(v3.state_schema_versions.settings).toBe(1);
+    expect(v3.state_schema_versions.transcripts).toBe(1);
+    expect(v3.transcripts).toEqual([]);
+    expect(v3.app_version).toBe('0.1.0');
   });
 
-  it('is idempotent for SnapshotV2', () => {
-    const v2 = migrateSnapshot(v1Snapshot);
-    const v2again = migrateSnapshot(v2);
-    expect(v2again).toEqual(v2);
+  it('is idempotent for latest snapshot', () => {
+    const v3 = migrateSnapshot(v1Snapshot);
+    const v3again = migrateSnapshot(v3);
+    expect(v3again).toEqual(v3);
   });
 
   it('rejects malformed snapshots', () => {

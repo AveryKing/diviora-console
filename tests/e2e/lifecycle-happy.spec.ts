@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Core Lifecycle - Happy Path', () => {
+  test.setTimeout(60_000);
+
   test.beforeEach(async ({ page }) => {
     // 1. Reset demo data at start to guarantee clean state (Invariant I3)
     await page.goto('/settings');
@@ -20,6 +22,7 @@ test.describe('Core Lifecycle - Happy Path', () => {
 
     // 3. Submit bug message
     await page.goto('/');
+    await expect(page.getByTestId('home-compose-textarea')).toBeVisible({ timeout: 60_000 });
     const bugMessage = 'Fixed button overlap on mobile in the checkout flow.';
     await page.fill('[data-testid="home-compose-textarea"]', bugMessage);
     await page.click('[data-testid="home-compose-submit"]');

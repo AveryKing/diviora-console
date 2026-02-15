@@ -4,21 +4,23 @@ import { useStore } from "../../lib/store";
 
 export default function AboutPage() {
   const { state } = useStore();
-  const { metadata, proposals, decisions, runs, settings } = state;
+  const { metadata, proposals, decisions, runs, transcripts, settings } = state;
 
   const handleCopyDiagnostics = () => {
     const diagnostics = {
       app_version: "0.1.0",
-      schemas: {
-        settings: settings.schema_version,
-        proposals: 1,
-        decisions: 1,
-        runs: 1,
-      },
+        schemas: {
+          settings: settings.schema_version,
+          proposals: 1,
+          decisions: 1,
+          runs: 1,
+          transcripts: 1,
+        },
       counts: {
         proposals: proposals.length,
         decisions: decisions.length,
         runs: runs.length,
+        transcripts: transcripts.length,
       },
       metadata: {
         last_exported_at: metadata.last_exported_at || "Never",
@@ -80,7 +82,7 @@ export default function AboutPage() {
 
           <section>
             <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">Data Inventory</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
                 <p className="text-xs text-gray-500 uppercase font-bold">Proposals</p>
                 <p className="text-2xl font-bold text-gray-900">{proposals.length}</p>
@@ -92,6 +94,10 @@ export default function AboutPage() {
               <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
                 <p className="text-xs text-gray-500 uppercase font-bold">Run Plans</p>
                 <p className="text-2xl font-bold text-gray-900">{runs.length}</p>
+              </div>
+              <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                <p className="text-xs text-gray-500 uppercase font-bold">Transcripts</p>
+                <p className="text-2xl font-bold text-gray-900">{transcripts.length}</p>
               </div>
             </div>
           </section>

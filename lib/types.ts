@@ -114,6 +114,45 @@ export const SnapshotV2Schema = z.object({
 
 export type SnapshotV2 = z.infer<typeof SnapshotV2Schema>;
 
+export const SnapshotTranscriptSchema = z.object({
+  transcript_id: z.string(),
+  run_id: z.string(),
+  proposal_id: z.string(),
+  created_at: z.string(),
+  status: z.literal('simulated'),
+  scenario_id: z.enum(['happy_path', 'flaky_inputs', 'rate_limited', 'validation_error']).optional(),
+  attempt: z.number().default(1),
+  events: z.array(z.object({
+    ts: z.string(),
+    level: z.enum(['info', 'warn', 'error']),
+    step_index: z.number(),
+    message: z.string(),
+    data: z.record(z.string(), z.unknown()).optional(),
+  })),
+});
+
+export type SnapshotTranscript = z.infer<typeof SnapshotTranscriptSchema>;
+
+export const SnapshotV3Schema = z.object({
+  snapshot_version: z.literal(3),
+  exported_at: z.string(),
+  app_version: z.string(),
+  state_schema_versions: z.object({
+    settings: z.number(),
+    proposals: z.number(),
+    decisions: z.number(),
+    runs: z.number(),
+    transcripts: z.number(),
+  }),
+  settings: SettingsSchema,
+  proposals: z.array(ProposalSchema),
+  decisions: z.array(DecisionSchema),
+  runs: z.array(RunPlanSchema),
+  transcripts: z.array(SnapshotTranscriptSchema),
+});
+
+export type SnapshotV3 = z.infer<typeof SnapshotV3Schema>;
+
 // Storage wrappers for versioning
 export const ProposalsCollectionSchema = z.object({
   schema_version: z.literal(1),
@@ -162,5 +201,4 @@ export const PolicyDecisionSchema = z.object({
 });
 
 export type PolicyDecision = z.infer<typeof PolicyDecisionSchema>;
-
 

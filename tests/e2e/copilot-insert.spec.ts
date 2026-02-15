@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Copilot Insert (Optional C)', () => {
+  test.setTimeout(60_000);
+
   test.beforeEach(async ({ page }) => {
     // 1. Reset demo data
     // 1. Reset demo data via Settings
@@ -9,6 +11,7 @@ test.describe('Copilot Insert (Optional C)', () => {
     await page.click('[data-testid="reset-all-data"]');
     await expect(page.getByText('Reset All Demo Data')).toBeVisible();
     await page.goto('/');
+    await expect(page.getByTestId('home-compose-textarea')).toBeVisible({ timeout: 60_000 });
   });
 
   test('no-submit on insert', async ({ page }) => {

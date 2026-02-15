@@ -26,6 +26,7 @@ export interface CopilotSession {
 interface SessionState {
   sessions: CopilotSession[];
   currentSessionId: string | null;
+  hydrated: boolean;
   actions: {
     createSession: (title?: string) => string;
     switchSession: (sessionId: string) => void;
@@ -37,12 +38,17 @@ interface SessionState {
   };
 }
 
+let setHydratedState: ((hydrated: boolean) => void) | null = null;
+
 export const useSessionStore = create<SessionState>()(
   persist(
-    (set, get) => ({
-      sessions: [],
-      currentSessionId: null,
-      actions: {
+    (set, get) => {
+      setHydratedState = (hydrated: boolean) => set({ hydrated });
+      return {
+        sessions: [],
+        currentSessionId: null,
+        hydrated: false,
+        actions: {
         createSession: (title = 'New Session') => {
           const id = `sess_${uuidv4()}`;
           const newSession: CopilotSession = {
@@ -114,11 +120,17 @@ export const useSessionStore = create<SessionState>()(
               ),
             }));
           },
-      },
-    }),
+        },
+      };
+    },
     {
       name: 'diviora.copilot_sessions.v1',
       storage: createJSONStorage(() => localStorage),
+      onRehydrateStorage: () => {
+        return () => {
+          setHydratedState?.(true);
+        };
+      },
       partialize: (state) => ({ 
           sessions: state.sessions, 
           currentSessionId: state.currentSessionId 

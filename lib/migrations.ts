@@ -1,13 +1,13 @@
-import { SnapshotV1Schema, SnapshotV2 } from './types';
+import { SnapshotV1Schema, SnapshotV2Schema, SnapshotV3 } from './types';
 
 const STORAGE_KEY_PROPOSALS = 'diviora.proposals.v1';
 const STORAGE_KEY_DECISIONS = 'diviora.decisions.v1';
 const STORAGE_KEY_RUNS = 'diviora.runs.v1';
 
 /**
- * Migrates a snapshot from any supported version to the latest (V2).
+ * Migrates a snapshot from any supported version to the latest (V3).
  */
-export function migrateSnapshot(input: unknown): SnapshotV2 {
+export function migrateSnapshot(input: unknown): SnapshotV3 {
   if (!input || typeof input !== 'object') {
     throw new Error('Invalid snapshot: input is not an object');
   }
@@ -15,11 +15,34 @@ export function migrateSnapshot(input: unknown): SnapshotV2 {
   const snapshot = input as { snapshot_version?: number };
 
   // Already latest version
-  if (snapshot.snapshot_version === 2) {
-    return input as SnapshotV2;
+  if (snapshot.snapshot_version === 3) {
+    return input as SnapshotV3;
   }
 
-  // Migrate V1 -> V2
+  // Migrate V2 -> V3
+  if (snapshot.snapshot_version === 2) {
+    const result = SnapshotV2Schema.safeParse(input);
+    if (!result.success) {
+      throw new Error(`Invalid SnapshotV2: ${result.error.issues[0].message}`);
+    }
+    const v2 = result.data;
+    return {
+      snapshot_version: 3,
+      exported_at: v2.exported_at,
+      app_version: v2.app_version,
+      state_schema_versions: {
+        ...v2.state_schema_versions,
+        transcripts: 1,
+      },
+      settings: v2.settings,
+      proposals: v2.proposals,
+      decisions: v2.decisions,
+      runs: v2.runs,
+      transcripts: [],
+    };
+  }
+
+  // Migrate V1 -> V3
   if (snapshot.snapshot_version === 1) {
     const result = SnapshotV1Schema.safeParse(input);
     if (!result.success) {
@@ -27,7 +50,7 @@ export function migrateSnapshot(input: unknown): SnapshotV2 {
     }
     const v1 = result.data;
     return {
-      snapshot_version: 2,
+      snapshot_version: 3,
       exported_at: v1.exported_at,
       app_version: v1.app_version || '0.1.0',
       state_schema_versions: {
@@ -35,11 +58,13 @@ export function migrateSnapshot(input: unknown): SnapshotV2 {
         proposals: 1,
         decisions: 1,
         runs: 1,
+        transcripts: 1,
       },
       settings: v1.settings,
       proposals: v1.proposals,
       decisions: v1.decisions,
       runs: v1.runs,
+      transcripts: [],
     };
   }
 

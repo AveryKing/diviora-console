@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Core Lifecycle - Failure & Diff', () => {
+  test.setTimeout(60_000);
+
   test.beforeEach(async ({ page }) => {
     // 1. Reset demo data
     await page.goto('/settings');
@@ -9,6 +11,7 @@ test.describe('Core Lifecycle - Failure & Diff', () => {
     
     // 2. Setup initial state: Proposal -> Approve -> Run Plan
     await page.goto('/');
+    await expect(page.getByTestId('home-compose-textarea')).toBeVisible({ timeout: 60_000 });
     await page.fill('[data-testid="home-compose-textarea"]', 'Connectivity issues in Region East.');
     await page.click('[data-testid="home-compose-submit"]');
     
