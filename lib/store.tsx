@@ -16,6 +16,7 @@ import {
 } from './types';
 import { migrateLocalStorage, migrateSnapshot } from './migrations';
 import { evaluatePolicy, PolicyError } from './policy';
+import { useSessionStore } from './session_store';
 
 type State = {
   proposals: Proposal[];
@@ -286,6 +287,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const resetAllData = () => {
     if (confirm("Are you sure you want to reset all data? This will clear all history and settings.")) {
       dispatch({ type: 'CLEAR_ALL' });
+      // Keep Copilot session state consistent with "Reset All Demo Data".
+      useSessionStore.setState({ sessions: [], currentSessionId: null });
+      localStorage.removeItem('diviora.copilot_sessions.v1');
     }
   };
   
