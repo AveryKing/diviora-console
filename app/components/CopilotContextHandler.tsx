@@ -3,6 +3,7 @@
 import { useCopilotReadable, useCopilotAction } from "@copilotkit/react-core";
 import { useStore } from "@/lib/store";
 import { usePathname, useParams } from "next/navigation";
+import { draftPromptSchema, bugTriageFieldsSchema, missingFieldsSchema } from "@/lib/copilot_actions_schema";
 
 export function CopilotContextHandler() {
   const { state } = useStore();
@@ -60,7 +61,67 @@ export function CopilotContextHandler() {
     value: selectedRun
   });
 
-  // 4. Draft Input Action
+  // 4. Structured Actions
+  
+  // A) draft_prompt_for_template
+  useCopilotAction({
+    name: "draft_prompt_for_template",
+    description: "Generates a refined starting prompt for a specific template based on raw user input.",
+    parameters: [
+      { name: "draft", type: "string", description: "The refined text for the composer.", required: true },
+    ],
+    handler: async ({ draft }) => {
+      const result = draftPromptSchema.safeParse({ draft });
+      if (!result.success) throw new Error("Invalid draft prompt output");
+      
+      window.dispatchEvent(new CustomEvent('diviora:copilot-draft', { 
+        detail: { draft: result.data.draft, source: 'template_draft' } 
+      }));
+    },
+  });
+
+  // B) extract_bug_triage_fields
+  useCopilotAction({
+    name: "extract_bug_triage_fields",
+    description: "Extracts structured bug report fields from a text block.",
+    parameters: [
+      { name: "title", type: "string", required: true },
+      { name: "severity", type: "string", required: true },
+      { name: "component", type: "string", required: true },
+      { name: "description", type: "string", required: true },
+      { name: "repro_steps", type: "string" },
+      { name: "expected_behavior", type: "string" },
+      { name: "actual_result", type: "string" },
+    ],
+    handler: async (fields) => {
+      const result = bugTriageFieldsSchema.safeParse(fields);
+      if (!result.success) throw new Error("Invalid bug triage fields extracted");
+
+      window.dispatchEvent(new CustomEvent('diviora:copilot-extraction', { 
+        detail: { fields: result.data, template: 'bug_triage' } 
+      }));
+    },
+  });
+
+  // C) suggest_missing_fields
+  useCopilotAction({
+    name: "suggest_missing_fields",
+    description: "Suggests missing fields or sections for the current proposal.",
+    parameters: [
+      { name: "missing", type: "string[]", required: true },
+      { name: "hints", type: "string[]", required: true },
+    ],
+    handler: async (data) => {
+      const result = missingFieldsSchema.safeParse(data);
+      if (!result.success) throw new Error("Invalid missing fields suggestion");
+
+      window.dispatchEvent(new CustomEvent('diviora:copilot-hints', { 
+        detail: { missing: result.data.missing, hints: result.data.hints } 
+      }));
+    },
+  });
+
+  // Legacy/Default Draft Action
   useCopilotAction({
     name: "draftNextMessage",
     description: "Drafts a suggested next message for the user based on the current context.",
@@ -73,12 +134,9 @@ export function CopilotContextHandler() {
       },
     ],
     handler: async ({ draft }) => {
-      // We broadcast the draft so the UI can catch it
       window.dispatchEvent(new CustomEvent('diviora:copilot-draft', { detail: { draft } }));
     },
   });
 
   return null;
 }
-
-
