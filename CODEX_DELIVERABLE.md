@@ -60,3 +60,7 @@ Port used: `http://localhost:3100`
 2. Confirm CI checks are green on the PR.
 3. Merge via squash into `main`.
 4. Confirm `main` CI is green after merge.
+
+## PR Link
+- https://github.com/AveryKing/diviora-console/pull/25
+- CI run (PR): https://github.com/AveryKing/diviora-console/actions/runs/22038377771/job/63675025994 (SUCCESS)
