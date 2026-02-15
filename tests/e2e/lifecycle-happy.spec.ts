@@ -29,7 +29,11 @@ test.describe('Core Lifecycle - Happy Path', () => {
     await page.click('[data-testid="home-compose-submit"]');
 
     // 4. Assert latest proposal link is present
-    await expect(page.locator('[data-testid="latest-proposal-link"]')).toBeVisible({ timeout: 15_000 });
+    const latestProposalLink = page.locator('[data-testid="latest-proposal-link"]');
+    await expect
+      .poll(async () => await latestProposalLink.count(), { timeout: 30_000 })
+      .toBeGreaterThan(0);
+    await expect(latestProposalLink).toBeVisible({ timeout: 15_000 });
 
     // 5. Open artifacts newest detail and assert template badge bug_triage
     await page.click('[data-testid="latest-proposal-link"]');
