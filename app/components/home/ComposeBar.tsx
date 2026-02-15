@@ -3,6 +3,8 @@ import { useStore } from '../../../lib/store';
 import { Proposal } from '../../../lib/types';
 import { useCopilotChat } from "@copilotkit/react-core";
 import { TextMessage, Role } from "@copilotkit/runtime-client-gql";
+import { emitCopilotHttpError } from '@/lib/copilot_error_bus';
+import { parseCopilotHttpErrorSync } from '@/lib/copilot_http_error';
 
 
 export function ComposeBar() {
@@ -59,10 +61,13 @@ export function ComposeBar() {
       setMessage('');
       
       // Let Copilot know
-      appendMessage(new TextMessage({
+      void appendMessage(new TextMessage({
         role: Role.System,
         content: `User submitted a proposal request: "${message}". New proposal created with ID: ${data.proposal_id}.`,
-      }));
+      })).catch((err) => {
+        const parsed = parseCopilotHttpErrorSync(err);
+        if (parsed) emitCopilotHttpError(parsed);
+      });
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
