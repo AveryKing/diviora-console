@@ -118,13 +118,11 @@ function ChatFirstHomeContent({ sessionId }: { sessionId: string }) {
   });
 
   const appendMessage = copilotChat.appendMessage;
-  const copilotMessages = useMemo(
-    () =>
-      copilotChat.messages.length > 0
-        ? copilotChat.messages
-        : copilotChat.visibleMessages,
-    [copilotChat.messages, copilotChat.visibleMessages]
-  );
+  const copilotMessages = useMemo(() => {
+    const messages = Array.isArray(copilotChat.messages) ? copilotChat.messages : [];
+    const visibleMessages = Array.isArray(copilotChat.visibleMessages) ? copilotChat.visibleMessages : [];
+    return messages.length > 0 ? messages : visibleMessages;
+  }, [copilotChat.messages, copilotChat.visibleMessages]);
   
   const [showContext, setShowContext] = useState(true);
 

@@ -18,6 +18,11 @@ vi.mock('@copilotkit/react-core', () => ({
     appendMessage: vi.fn(),
     visibleMessages: [],
   })),
+  useCopilotChatInternal: vi.fn(() => ({
+    appendMessage: vi.fn(),
+    messages: [],
+    visibleMessages: [],
+  })),
   useCopilotReadable: vi.fn(),
   useCopilotAction: vi.fn(),
   CopilotKit: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
