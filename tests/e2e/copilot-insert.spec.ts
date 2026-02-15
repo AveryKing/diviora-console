@@ -12,13 +12,18 @@ test.describe('Copilot Insert (Optional C)', () => {
   });
 
   test('no-submit on insert', async ({ page }) => {
-    // 2. Open Copilot Sidebar (if closed initially, toggle button might not be visible depending on screen size, assuming desktop default visible or toggle)
-    // Wait, sidebar is inside the page. Let's make sure we can trigger the draft event.
-    
-    // 3. Mock a suggestion via event dispatch (bypassing LLM)
-    await page.evaluate(() => {
-      window.dispatchEvent(new CustomEvent('diviora:copilot-draft', { detail: { draft: 'Mock Draft Suggestion' } }));
-    });
+    // 2. Wait until compose controls are mounted before dispatching the mock draft event.
+    await expect(page.getByTestId('home-compose-textarea')).toBeVisible();
+    await expect(page.getByTestId('home-compose-submit')).toBeVisible();
+
+    // 3. Mock a suggestion via event dispatch (bypassing LLM).
+    // Retry dispatch while the page settles to avoid losing the event during remount churn.
+    await expect.poll(async () => {
+      await page.evaluate(() => {
+        window.dispatchEvent(new CustomEvent('diviora:copilot-draft', { detail: { draft: 'Mock Draft Suggestion' } }));
+      });
+      return page.getByTestId('copilot-draft-card').count();
+    }).toBeGreaterThan(0);
 
     // 4. Assert suggestion appears in StreamingText
     const suggestion = page.getByTestId('copilot-suggestion');
