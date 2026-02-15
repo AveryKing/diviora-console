@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useCopilotChatInternal, CopilotKit } from "@copilotkit/react-core";
 import { TextMessage, Role } from "@copilotkit/runtime-client-gql";
 import { CopilotChat } from "@copilotkit/react-ui";
@@ -27,6 +27,7 @@ export function ChatFirstHome() {
     }).persist;
     return persistApi ? persistApi.hasHydrated() : true;
   });
+  const isBootstrappingSessionRef = useRef(false);
 
   // Sync hydration state from Zustand persist
   useEffect(() => {
@@ -50,15 +51,20 @@ export function ChatFirstHome() {
   // Ensure an active session exists
   useEffect(() => {
     if (!isHydrated) return;
+    if (currentSessionId) {
+      // Reset guard once we have a stable active session.
+      isBootstrappingSessionRef.current = false;
+      return;
+    }
+    if (isBootstrappingSessionRef.current) return;
+    isBootstrappingSessionRef.current = true;
 
-    if (!currentSessionId) {
-        if (hasSessions) {
-            // Need to find first session ID but don't want to depend on 'sessions' array
-            const firstSession = useSessionStore.getState().sessions[0];
-            if (firstSession) actions.switchSession(firstSession.session_id);
-        } else {
-            actions.createSession('New Session');
-        }
+    if (hasSessions) {
+      // Need to find first session ID but don't want to depend on 'sessions' array
+      const firstSession = useSessionStore.getState().sessions[0];
+      if (firstSession) actions.switchSession(firstSession.session_id);
+    } else {
+      actions.createSession('New Session');
     }
   }, [currentSessionId, hasSessions, actions, isHydrated]);
 
