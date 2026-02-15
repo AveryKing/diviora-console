@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { clickComposeSubmitWithRetry, fillComposeWithRetry } from './helpers';
 
 test.describe('Core Lifecycle - Failure & Diff', () => {
   test.beforeEach(async ({ page }) => {
@@ -9,8 +10,8 @@ test.describe('Core Lifecycle - Failure & Diff', () => {
     
     // 2. Setup initial state: Proposal -> Approve -> Run Plan
     await page.goto('/');
-    await page.fill('[data-testid="home-compose-textarea"]', 'Connectivity issues in Region East.');
-    await page.click('[data-testid="home-compose-submit"]');
+    await fillComposeWithRetry(page, 'Connectivity issues in Region East.');
+    await clickComposeSubmitWithRetry(page);
     
     await expect(page.locator('[data-testid="latest-proposal-link"]')).toBeVisible();
     await page.click('[data-testid="latest-proposal-link"]');

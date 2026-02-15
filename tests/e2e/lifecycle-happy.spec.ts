@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { clickComposeSubmitWithRetry, fillComposeWithRetry } from './helpers';
 
 test.describe('Core Lifecycle - Happy Path', () => {
   test.beforeEach(async ({ page }) => {
@@ -21,8 +22,8 @@ test.describe('Core Lifecycle - Happy Path', () => {
     // 3. Submit bug message
     await page.goto('/');
     const bugMessage = 'Fixed button overlap on mobile in the checkout flow.';
-    await page.fill('[data-testid="home-compose-textarea"]', bugMessage);
-    await page.click('[data-testid="home-compose-submit"]');
+    await fillComposeWithRetry(page, bugMessage);
+    await clickComposeSubmitWithRetry(page);
 
     // 4. Assert latest proposal link is present
     await expect(page.locator('[data-testid="latest-proposal-link"]')).toBeVisible();

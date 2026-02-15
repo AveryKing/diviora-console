@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { waitForComposeReady } from './helpers';
 
 test.describe('Copilot Insert (Optional C)', () => {
   test.beforeEach(async ({ page }) => {
@@ -13,7 +14,7 @@ test.describe('Copilot Insert (Optional C)', () => {
 
   test('no-submit on insert', async ({ page }) => {
     // 2. Wait until compose controls are mounted before dispatching the mock draft event.
-    await expect(page.getByTestId('home-compose-textarea')).toBeVisible();
+    await waitForComposeReady(page);
     await expect(page.getByTestId('home-compose-submit')).toBeVisible();
 
     // 3. Mock a suggestion via event dispatch (bypassing LLM).
