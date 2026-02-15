@@ -28,7 +28,9 @@ test.describe('Core Lifecycle - Happy Path', () => {
     await expect(page.getByTestId('home-compose-submit')).toBeEnabled();
     await page.click('[data-testid="home-compose-submit"]');
 
-    // 4. Assert latest proposal link is present
+    // 4. Ensure artifact tab is active, then assert latest proposal link is present
+    await page.click('[data-testid="home-artifact-tab-artifact"]');
+    await expect(page.getByTestId('proposal-sections')).toBeVisible({ timeout: 30_000 });
     const latestProposalLink = page.locator('[data-testid="latest-proposal-link"]');
     await expect
       .poll(async () => await latestProposalLink.count(), { timeout: 30_000 })
