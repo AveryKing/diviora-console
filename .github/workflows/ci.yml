@@ -9,6 +9,9 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    env:
+      DIVIORA_CONSOLE_AUTH_TOKEN: test-token
+      NEXT_PUBLIC_DIVIORA_CONSOLE_AUTH_TOKEN: test-token
     
     steps:
       - name: Checkout code

@@ -14,19 +14,16 @@ import { CopilotMessage, useSessionStore } from '@/lib/session_store';
 import { SessionList } from '../sessions/SessionList';
 import { CopilotContextHandler } from '../CopilotContextHandler';
 
-type SessionStorePersistApi = {
-  persist?: {
-    hasHydrated: () => boolean;
-  };
-};
-
 export function ChatFirstHome() {
   const currentSessionId = useSessionStore(state => state.currentSessionId);
   const hasSessions = useSessionStore(state => state.sessions.length > 0);
   const firstSessionId = useSessionStore(state => state.sessions[0]?.session_id ?? null);
-  const hydratedFromStore = useSessionStore(state => state.hydrated);
-  const isHydrated = hydratedFromStore || ((useSessionStore as unknown as SessionStorePersistApi).persist?.hasHydrated() ?? false);
+  const isHydrated = useSessionStore(state => state.hydrated);
   const actions = useSessionStore(state => state.actions);
+  const authToken = process.env.NEXT_PUBLIC_DIVIORA_CONSOLE_AUTH_TOKEN;
+  const headers = authToken
+    ? { "X-DIVIORA-AUTH": authToken }
+    : undefined;
 
   // Ensure an active session exists
   useEffect(() => {
@@ -54,6 +51,7 @@ export function ChatFirstHome() {
                 <CopilotKit
                   runtimeUrl="/api/copilot"
                   threadId={currentSessionId || undefined}
+                  headers={headers}
                 >
                     <CopilotContextHandler />
                     {currentSessionId ? (
