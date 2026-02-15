@@ -49,6 +49,16 @@ export function ChatFirstHome() {
     return unsubscribe;
   }, []);
 
+  // Fail-safe: never keep the UI blocked indefinitely if persist hydration callbacks
+  // are delayed or missed under test/runtime timing variance.
+  useEffect(() => {
+    if (isHydrated) return;
+    const fallbackTimer = window.setTimeout(() => {
+      setIsHydrated(true);
+    }, 1500);
+    return () => window.clearTimeout(fallbackTimer);
+  }, [isHydrated]);
+
   // Ensure an active session exists
   useEffect(() => {
     if (!isHydrated) return;
