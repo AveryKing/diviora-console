@@ -194,6 +194,38 @@ export const TranscriptsCollectionSchema = z.object({
   items: z.array(RunTranscriptSchema),
 });
 
+export const SnapshotGateStatusSchema = z.object({
+  gate: z.string(),
+  status: z.enum(['PASS', 'FAIL', 'UNKNOWN']),
+});
+
+export type SnapshotGateStatus = z.infer<typeof SnapshotGateStatusSchema>;
+
+export const ProjectSnapshotSummarySchema = z.object({
+  gate_statuses: z.array(SnapshotGateStatusSchema).optional(),
+  parse_status: z.enum(['parsed', 'unparsed']),
+});
+
+export type ProjectSnapshotSummary = z.infer<typeof ProjectSnapshotSummarySchema>;
+
+export const ProjectSnapshotSchema = z.object({
+  snapshot_id: z.string(),
+  created_at: z.string(),
+  source: z.enum(['manual_paste', 'import_file']),
+  repo_name: z.string().optional(),
+  branch: z.string().optional(),
+  head_sha: z.string().optional(),
+  raw_markdown: z.string(),
+  parsed_summary: ProjectSnapshotSummarySchema.optional(),
+});
+
+export type ProjectSnapshot = z.infer<typeof ProjectSnapshotSchema>;
+
+export const ProjectSnapshotsCollectionSchema = z.object({
+  schema_version: z.literal(1),
+  items: z.array(ProjectSnapshotSchema),
+});
+
 export const PolicyDecisionSchema = z.object({
   allowed: z.boolean(),
   reasons: z.array(z.string()),
@@ -201,4 +233,3 @@ export const PolicyDecisionSchema = z.object({
 });
 
 export type PolicyDecision = z.infer<typeof PolicyDecisionSchema>;
-
