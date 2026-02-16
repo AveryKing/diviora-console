@@ -5,15 +5,28 @@ import { useStore } from "@/lib/store";
 import { ProposalRenderer } from "../ProposalRenderer";
 import { ContextPanel } from "./ContextPanel";
 import Link from "next/link";
+import { Proposal } from "@/lib/types";
 
 type HomeArtifactPanelProps = {
   tab: "artifact" | "context";
   onTabChange: (tab: "artifact" | "context") => void;
 };
 
+function getLatestProposal(proposals: Proposal[]): Proposal | null {
+  if (proposals.length === 0) return null;
+  return proposals.reduce((latest, candidate) => {
+    const latestTs = Date.parse(latest.created_at);
+    const candidateTs = Date.parse(candidate.created_at);
+
+    if (Number.isNaN(candidateTs)) return latest;
+    if (Number.isNaN(latestTs)) return candidate;
+    return candidateTs > latestTs ? candidate : latest;
+  });
+}
+
 export function HomeArtifactPanel({ tab, onTabChange }: HomeArtifactPanelProps) {
   const { state } = useStore();
-  const latestProposal = state.proposals[0] ?? null;
+  const latestProposal = getLatestProposal(state.proposals);
 
   const hasProposal = Boolean(latestProposal);
 

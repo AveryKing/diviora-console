@@ -2,13 +2,18 @@ import { CopilotRuntime, OpenAIAdapter, copilotRuntimeNextJSAppRouterEndpoint } 
 import OpenAI from "openai";
 import { NextRequest } from "next/server";
 import { createSlidingWindowRateLimiter } from "@/lib/ratelimit";
+import packageJson from "@/package.json";
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// Keep in sync with installed CopilotKit packages. Avoid importing from `@copilotkit/shared`
-// here, since that dependency chain can break Vitest in this repo's test environment.
-const COPILOTKIT_VERSION = "1.51.3";
+function readCopilotKitVersion(): string {
+  const dependencies = packageJson.dependencies ?? {};
+  if (typeof dependencies["@copilotkit/runtime"] === "string") {
+    return dependencies["@copilotkit/runtime"];
+  }
+  return "unknown";
+}
 
 const RATE_LIMIT_COUNT = 30;
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
@@ -100,7 +105,7 @@ function isSingleTransportInfoCall(payload: unknown): boolean {
 function runtimeInfoResponse(): Response {
   return new Response(
     JSON.stringify({
-      version: COPILOTKIT_VERSION,
+      version: readCopilotKitVersion(),
       audioFileTranscriptionEnabled: false,
       agents: {
         default: {

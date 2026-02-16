@@ -1,11 +1,16 @@
 import { NextRequest } from "next/server";
+import packageJson from "@/package.json";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// Keep in sync with installed CopilotKit packages. Avoid importing from `@copilotkit/shared`
-// here, since that dependency chain can break Vitest in this repo's test environment.
-const COPILOTKIT_VERSION = "1.51.3";
+function readCopilotKitVersion(): string {
+  const dependencies = packageJson.dependencies ?? {};
+  if (typeof dependencies["@copilotkit/runtime"] === "string") {
+    return dependencies["@copilotkit/runtime"];
+  }
+  return "unknown";
+}
 
 function json(status: number, body: unknown, extraHeaders?: HeadersInit): Response {
   return new Response(JSON.stringify(body), {
@@ -27,7 +32,7 @@ async function handleInfo(req: NextRequest): Promise<Response> {
   // CopilotKit runtime sync expects this shape from `${runtimeUrl}/info`.
   // We expose a minimal RuntimeInfo payload so the client can register at least a "default" agent.
   return json(200, {
-    version: COPILOTKIT_VERSION,
+    version: readCopilotKitVersion(),
     audioFileTranscriptionEnabled: false,
     agents: {
       default: {
