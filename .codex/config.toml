@@ -1,0 +1,33 @@
+# Project-scoped Codex config for diviora-console
+# Scope: repository local config only (no secrets)
+
+# Default model (best available Codex model in this environment)
+model = "gpt-5-codex"
+
+# Default safety/execution posture
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+network_access = false
+
+# Enable network only when explicitly needed for a task, for example:
+# 1) Temporarily set `network_access = true` for the active profile, OR
+# 2) Run with a profile that enables network and request approval as needed.
+
+[profiles.pm]
+# Conservative planning/reporting profile
+# Prefer read-only if supported by your Codex runtime.
+approval_policy = "on-request"
+sandbox_mode = "read-only"
+network_access = false
+
+[profiles.impl]
+# Implementation profile
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+network_access = false
+
+[profiles.review]
+# Review/audit profile with minimal permissions
+approval_policy = "on-request"
+sandbox_mode = "read-only"
+network_access = false
