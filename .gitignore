@@ -35,7 +35,12 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+
+# codex workflow hygiene
 CODEX_MANUAL_REPORT.md
+STATE_SNAPSHOT.md
+AUDIT_GRADE_*.md
+reports/
 
 # vercel
 .vercel
