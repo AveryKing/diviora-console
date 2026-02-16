@@ -84,4 +84,16 @@ describe('Migrations Logic (Issue #9)', () => {
     expect(migrated.schema_version).toBe(1);
     expect(migrated.items).toHaveLength(1);
   });
+
+  it('migrates raw project snapshots array to versioned collection', () => {
+    localStorage.clear();
+    const rawSnapshots = [{ snapshot_id: 'ps_1', raw_markdown: '# snapshot' }];
+    localStorage.setItem('diviora.project_snapshots.v1', JSON.stringify(rawSnapshots));
+
+    migrateLocalStorage();
+
+    const migrated = JSON.parse(localStorage.getItem('diviora.project_snapshots.v1')!);
+    expect(migrated.schema_version).toBe(1);
+    expect(migrated.items).toHaveLength(1);
+  });
 });
