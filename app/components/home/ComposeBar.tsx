@@ -6,6 +6,18 @@ import { TextMessage, Role } from "@copilotkit/runtime-client-gql";
 import { emitCopilotHttpError } from '@/lib/copilot_error_bus';
 import { parseCopilotHttpErrorSync } from '@/lib/copilot_http_error';
 
+type CompileSubmitEventDetail = {
+  message: string;
+};
+
+type ProposalCreatedEventDetail = {
+  proposal_id: string;
+};
+
+function emitHomeEvent<T>(name: string, detail: T) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent<T>(name, { detail }));
+}
 
 export function ComposeBar() {
   const [message, setMessage] = useState('');
@@ -38,6 +50,7 @@ export function ComposeBar() {
     }
 
     setIsLoading(true);
+    emitHomeEvent<CompileSubmitEventDetail>("diviora:compile-submitted", { message });
 
     try {
       const response = await fetch('/api/compile', {
@@ -58,6 +71,7 @@ export function ComposeBar() {
 
       const data: Proposal = await response.json();
       addProposal(data);
+      emitHomeEvent<ProposalCreatedEventDetail>("diviora:proposal-created", { proposal_id: data.proposal_id });
       setMessage('');
       
       // Let Copilot know

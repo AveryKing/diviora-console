@@ -2,9 +2,18 @@ import { CopilotRuntime, OpenAIAdapter, copilotRuntimeNextJSAppRouterEndpoint } 
 import OpenAI from "openai";
 import { NextRequest } from "next/server";
 import { createSlidingWindowRateLimiter } from "@/lib/ratelimit";
+import packageJson from "@/package.json";
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+
+function readCopilotKitVersion(): string {
+  const dependencies = packageJson.dependencies ?? {};
+  if (typeof dependencies["@copilotkit/runtime"] === "string") {
+    return dependencies["@copilotkit/runtime"];
+  }
+  return "unknown";
+}
 
 const RATE_LIMIT_COUNT = 30;
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
@@ -87,6 +96,34 @@ function validatePayload(payload: unknown): PayloadGuardResult {
   return { ok: true };
 }
 
+function isSingleTransportInfoCall(payload: unknown): boolean {
+  if (!payload || typeof payload !== "object") return false;
+  const record = payload as JsonRecord;
+  return record.method === "info";
+}
+
+function runtimeInfoResponse(): Response {
+  return new Response(
+    JSON.stringify({
+      version: readCopilotKitVersion(),
+      audioFileTranscriptionEnabled: false,
+      agents: {
+        default: {
+          name: "default",
+          className: "BuiltInAgent",
+          description: "Default agent",
+        },
+      },
+    }),
+    {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
+}
+
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return await new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -113,19 +150,25 @@ export const POST = async (req: NextRequest) => {
     return jsonError(401, "unauthorized");
   }
 
+  let parsedBody: unknown = null;
+  try {
+    parsedBody = await req.clone().json();
+  } catch {
+    return jsonError(400, "invalid_json");
+  }
+
+  // CopilotKit2's "single" transport probes runtime info via POST { method: "info" } to runtimeUrl.
+  // This must succeed without invoking an LLM.
+  if (isSingleTransportInfoCall(parsedBody)) {
+    return runtimeInfoResponse();
+  }
+
   const clientKey = getClientKey(req);
   const rate = limiter.check(clientKey);
   if (!rate.allowed) {
     return jsonError(429, "rate_limited", {
       "Retry-After": String(rate.retryAfterSeconds),
     });
-  }
-
-  let parsedBody: unknown = null;
-  try {
-    parsedBody = await req.clone().json();
-  } catch {
-    return jsonError(400, "invalid_json");
   }
 
   const payloadCheck = validatePayload(parsedBody);

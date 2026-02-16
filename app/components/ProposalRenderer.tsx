@@ -7,17 +7,19 @@ interface ProposalRendererProps {
   proposal: Proposal;
   isLatest?: boolean; // If true, we show previews/previews for Home page
   showActions?: boolean;
+  density?: 'default' | 'dense';
 }
 
-export function ProposalRenderer({ proposal, isLatest = false }: ProposalRendererProps) {
+export function ProposalRenderer({ proposal, isLatest = false, density = 'default' }: ProposalRendererProps) {
   const { proposal: data, proposal_id, created_at } = proposal;
   const hasSections = data.sections && data.sections.length > 0;
+  const isDense = density === 'dense';
 
   return (
     <div className="flex-1 space-y-4">
       <div className="border-b border-gray-100 pb-4">
         <div className="flex items-center gap-2 mb-2">
-          <h3 className={`${isLatest ? 'text-xl' : 'text-3xl'} font-bold text-gray-900 flex-1`}>
+          <h3 className={`${isLatest ? 'text-xl' : isDense ? 'text-xl' : 'text-3xl'} font-bold text-gray-900 flex-1`}>
             {data.title}
           </h3>
           {data.template_id && (
@@ -36,7 +38,11 @@ export function ProposalRenderer({ proposal, isLatest = false }: ProposalRendere
       {hasSections ? (
         <div data-testid="proposal-sections" className={isLatest ? "space-y-6" : "divide-y divide-gray-100 border-b border-gray-100"}>
           {data.sections!.map((section) => (
-            <div key={section.key} data-testid={`section-${section.key}`} className={isLatest ? "space-y-2" : "p-8"}>
+            <div
+              key={section.key}
+              data-testid={`section-${section.key}`}
+              className={isLatest ? "space-y-2" : isDense ? "p-4" : "p-8"}
+            >
               <h4 data-testid="section-title" className="text-xs font-bold text-gray-400 uppercase tracking-wider">
                 {section.title}
               </h4>
@@ -113,7 +119,11 @@ export function ProposalRenderer({ proposal, isLatest = false }: ProposalRendere
         </div>
       )}
 
-      <div className={`pt-4 mt-auto border-t border-gray-50 flex justify-between items-center text-[10px] text-gray-400 ${!isLatest && 'px-8 pb-4'}`}>
+      <div
+        className={`pt-4 mt-auto border-t border-gray-50 flex justify-between items-center text-[10px] text-gray-400 ${
+          !isLatest && (isDense ? 'px-4 pb-3' : 'px-8 pb-4')
+        }`}
+      >
         <span>Created: {new Date(created_at).toLocaleString()}</span>
         <span className="font-mono bg-gray-50 px-2 py-0.5 rounded italic">
           ID: {isLatest ? proposal_id.substring(0, 12) : proposal_id}

@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useCopilotChatInternal, CopilotKit } from "@copilotkit/react-core";
 import { TextMessage, Role } from "@copilotkit/runtime-client-gql";
 import { CopilotChat } from "@copilotkit/react-ui";
 import "@copilotkit/react-ui/styles.css";
 import { Sparkles } from 'lucide-react';
-import { ContextPanel } from './ContextPanel';
 import { ComposeBar } from './ComposeBar';
 import { DraftCard } from './DraftCard';
 import { CopilotActivityTicker } from '../CopilotActivityTicker';
@@ -16,6 +15,7 @@ import { CopilotContextHandler } from '../CopilotContextHandler';
 import { CopilotErrorUX } from '../copilot/CopilotErrorUX';
 import { emitCopilotHttpError } from '@/lib/copilot_error_bus';
 import { parseCopilotHttpErrorSync } from '@/lib/copilot_http_error';
+import { HomeArtifactPanel } from './HomeArtifactPanel';
 
 export function ChatFirstHome() {
   const currentSessionId = useSessionStore(state => state.currentSessionId);
@@ -76,6 +76,10 @@ function ChatFirstHomeContent({ sessionId }: { sessionId: string }) {
   const [isDrafting, setIsDrafting] = useState(false);
   const [draftCount, setDraftCount] = useState(0);
   const [chatError, setChatError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'split' | 'focus'>('split');
+  const [rightTab, setRightTab] = useState<'artifact' | 'context'>('artifact');
+  const [lifecycleLabel, setLifecycleLabel] = useState<string | null>(null);
+  const lifecycleTimerRef = useRef<number | null>(null);
   
   const session = useSessionStore(state => state.sessions.find(s => s.session_id === sessionId));
   const sessionActions = useSessionStore(state => state.actions);
@@ -103,8 +107,49 @@ function ChatFirstHomeContent({ sessionId }: { sessionId: string }) {
     const visibleMessages = Array.isArray(copilotChat.visibleMessages) ? copilotChat.visibleMessages : [];
     return messages.length > 0 ? messages : visibleMessages;
   }, [copilotChat.messages, copilotChat.visibleMessages]);
-  
-  const [showContext, setShowContext] = useState(true);
+ 
+  const setTransientLifecycleLabel = useCallback((label: string, ttlMs: number) => {
+    setLifecycleLabel(label);
+    if (lifecycleTimerRef.current) {
+      window.clearTimeout(lifecycleTimerRef.current);
+    }
+    lifecycleTimerRef.current = window.setTimeout(() => {
+      setLifecycleLabel(null);
+      lifecycleTimerRef.current = null;
+    }, ttlMs);
+  }, []);
+
+  useEffect(() => {
+    const onInserted = () => setTransientLifecycleLabel("Inserted", 2000);
+    const onSubmitted = (e: Event) => {
+      const ce = e as CustomEvent<{ message: string }>;
+      if (ce.detail?.message) {
+        setTransientLifecycleLabel("Submitted", 2500);
+      } else {
+        setTransientLifecycleLabel("Submitted", 2500);
+      }
+    };
+    const onCreated = (e: Event) => {
+      const ce = e as CustomEvent<{ proposal_id: string }>;
+      const id = ce.detail?.proposal_id ? ce.detail.proposal_id.slice(0, 12) : "";
+      setTransientLifecycleLabel(id ? `Proposal created (${id})` : "Proposal created", 3500);
+      setRightTab("artifact");
+      setViewMode("split");
+    };
+
+    window.addEventListener("diviora:insert-input", onInserted as EventListener);
+    window.addEventListener("diviora:compile-submitted", onSubmitted as EventListener);
+    window.addEventListener("diviora:proposal-created", onCreated as EventListener);
+    return () => {
+      window.removeEventListener("diviora:insert-input", onInserted as EventListener);
+      window.removeEventListener("diviora:compile-submitted", onSubmitted as EventListener);
+      window.removeEventListener("diviora:proposal-created", onCreated as EventListener);
+      if (lifecycleTimerRef.current) {
+        window.clearTimeout(lifecycleTimerRef.current);
+        lifecycleTimerRef.current = null;
+      }
+    };
+  }, [setTransientLifecycleLabel]);
 
   const getNormalizedRole = (value: unknown): CopilotMessage['role'] => {
     const rawRole = typeof value === 'string' ? value.toLowerCase() : '';
@@ -205,93 +250,95 @@ function ChatFirstHomeContent({ sessionId }: { sessionId: string }) {
 
   return (
     <div className="flex-1 flex overflow-hidden">
-       {/* Main Chat Area */}
-       <div data-testid="home-chat-main" className="flex-1 flex flex-col min-w-0 bg-gray-50/50">
-          <div className="flex-1 overflow-hidden relative flex flex-col glass-panel m-4 rounded-3xl">
-             {/* Header */}
-             <div className="px-6 py-4 border-b border-gray-200/50 flex items-center gap-3 bg-white/40">
-                <div className="p-2 bg-gray-900 rounded-xl">
-                   <Sparkles className="h-4 w-4 text-emerald-400" />
+      <div data-testid="home-chat-main" className="flex-1 flex flex-col min-w-0 bg-gray-50/50">
+        <div className="flex-1 overflow-hidden relative flex flex-col glass-panel m-4 rounded-3xl">
+          <div className="px-6 py-4 border-b border-gray-200/50 flex items-center gap-3 bg-white/40">
+            <div className="p-2 bg-gray-900 rounded-xl">
+              <Sparkles className="h-4 w-4 text-emerald-400" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-sm font-bold text-gray-900 truncate">{session?.title || "Copilot Chat"}</h2>
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">Chat is the canvas; artifacts are the outcome.</p>
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                type="button"
+                data-testid="home-focus-toggle"
+                onClick={() => setViewMode((m) => (m === "focus" ? "split" : "focus"))}
+                className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider rounded border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                title={viewMode === "focus" ? "Split view" : "Focus mode"}
+              >
+                {viewMode === "focus" ? "Split" : "Focus"}
+              </button>
+              {lifecycleLabel && (
+                <div
+                  data-testid="home-lifecycle-status"
+                  className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded bg-emerald-50 text-emerald-800 border border-emerald-100"
+                >
+                  {lifecycleLabel}
                 </div>
-                <div>
-                   <h2 className="text-sm font-bold text-gray-900">{session?.title || "Copilot Chat"}</h2>
-                   <p className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">Diviora Intelligent Assistant</p>
-                </div>
-             </div>
-
-             <div className="flex-1 overflow-y-auto">
-                <CopilotChat
-                   className="h-full border-none shadow-none bg-transparent"
-                   instructions="You are a helpful assistant for the Diviora Console. You help users refine proposals and clarify needs using available context."
-                   labels={{
-                      title: session?.title || "Copilot Chat",
-                      initial: "Hi. I can help you draft proposals, troubleshoot, and prepare next actions from your current context.",
-                      placeholder: "Ask Copilot...",
-                   }}
-                />
-             </div>
-
-             {chatError && (
-                <div className="mx-6 mb-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                  {chatError}
-                </div>
-             )}
-             
-             <div className="absolute top-4 right-4 z-10 pointer-events-none">
-                <div className="pointer-events-auto">
-                   <CopilotActivityTicker 
-                      key={draftCount}
-                      isActive={isDrafting} 
-                      onComplete={() => setIsDrafting(false)} 
-                   />
-                </div>
-             </div>
+              )}
+            </div>
           </div>
 
-          <div className="border-t border-gray-200 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20">
-             <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
-                <div className="flex gap-2">
-                   <button
-                      onClick={handleDraftRequest}
-                      className="px-3 py-1.5 bg-gray-900 text-white text-[10px] font-bold rounded hover:bg-gray-800 transition uppercase tracking-wider flex items-center gap-2 shadow-sm"
-                   >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                      Draft Suggestion
-                   </button>
-                </div>
-                <div className="md:hidden">
-                   <button 
-                      onClick={() => setShowContext(!showContext)}
-                      className="text-gray-500 hover:text-gray-700 p-1"
-                   >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                   </button>
-                </div>
-             </div>
-
-             <div className="bg-gray-50 p-4 pb-0">
-                <DraftCard />
-             </div>
-             
-             <ComposeBar /> 
+          <div className="flex-1 overflow-y-auto">
+            <CopilotChat
+              className="h-full border-none shadow-none bg-transparent"
+              instructions="You are a helpful assistant for the Diviora Console. You help users refine proposals and clarify needs using available context."
+              labels={{
+                title: session?.title || "Copilot Chat",
+                initial: "Hi. I can help you draft proposals, troubleshoot, and prepare next actions from your current context.",
+                placeholder: "Ask Copilot...",
+              }}
+            />
           </div>
-       </div>
 
-       <div className={`w-80 border-l border-gray-200 bg-white flex flex-col transition-all duration-300 ${showContext ? 'translate-x-0' : 'translate-x-full absolute right-0 h-full shadow-xl md:relative md:translate-x-0 md:shadow-none'}`}>
-          <div className="p-4 border-b border-gray-100 flex justify-between items-center md:hidden">
-             <h3 className="text-xs font-bold uppercase text-gray-400">Context</h3>
-             <button onClick={() => setShowContext(false)}>
-                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          {chatError && (
+            <div className="mx-6 mb-2 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {chatError}
+            </div>
+          )}
+
+          <div className="absolute top-4 right-4 z-10 pointer-events-none">
+            <div className="pointer-events-auto">
+              <CopilotActivityTicker
+                key={draftCount}
+                isActive={isDrafting}
+                onComplete={() => setIsDrafting(false)}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-gray-200 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-20">
+          <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex justify-between items-center">
+            <div className="flex gap-2 items-center">
+              <button
+                onClick={handleDraftRequest}
+                className="px-3 py-1.5 bg-gray-900 text-white text-[10px] font-bold rounded hover:bg-gray-800 transition uppercase tracking-wider flex items-center gap-2 shadow-sm"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
-             </button>
+                Draft Suggestion
+              </button>
+              <span className="text-[10px] text-gray-500">
+                Drafting → Inserted → Submitted → Proposal created
+              </span>
+            </div>
           </div>
-          <ContextPanel />
-       </div>
+
+          <div className="bg-gray-50 p-4 pb-0">
+            <DraftCard />
+          </div>
+
+          <ComposeBar />
+        </div>
+      </div>
+
+      {viewMode === "split" && (
+        <HomeArtifactPanel tab={rightTab} onTabChange={setRightTab} />
+      )}
     </div>
   );
 }

@@ -47,8 +47,11 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
+    // In CI we run against `next start`, but the client bundle needs NEXT_PUBLIC_* values
+    // inlined at build time. Rebuilding here keeps e2e hermetic and avoids auth header
+    // being omitted in production mode.
     command: process.env.CI
-      ? `npx next start --port ${E2E_PORT}`
+      ? `npx next build && npx next start --port ${E2E_PORT}`
       : `npx next dev --port ${E2E_PORT}`,
     url: `${E2E_BASE_URL}/api/health`,
     env: {
