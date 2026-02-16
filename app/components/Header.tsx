@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const navLinks = [
+  { href: '/agent', label: 'Agent' },
   { href: '/', label: 'Home' },
   { href: '/artifacts', label: 'Artifacts' },
   { href: '/approvals', label: 'Approvals' },
@@ -22,7 +23,7 @@ export default function Header() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           <div className="flex items-center">
-            <h1 className="text-xl font-bold text-gray-900">Diviora Console</h1>
+            <Link href="/agent" className="text-xl font-bold text-gray-900">Diviora Console</Link>
           </div>
           <nav className="flex space-x-8 items-center">
             {navLinks.map((link) => {

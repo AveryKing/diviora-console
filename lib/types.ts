@@ -71,6 +71,7 @@ export const SettingsSchema = z.object({
   risk_level: z.enum(['low', 'medium', 'high']),
   default_step_count: z.union([z.literal(3), z.literal(5), z.literal(7)]),
   timeline_mode: z.enum(['compact', 'expanded']),
+  agent_view_mode: z.enum(['split', 'focus']).optional(),
   template_id: z.enum(['generic', 'sales_outreach', 'bug_triage', 'project_plan']).default('generic'),
 });
 
