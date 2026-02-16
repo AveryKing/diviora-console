@@ -58,6 +58,7 @@ const defaultSettings: Settings = {
   risk_level: 'medium',
   default_step_count: 5,
   timeline_mode: 'expanded',
+  agent_view_mode: 'split',
   template_id: 'generic',
 };
 

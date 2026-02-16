@@ -16,6 +16,8 @@ import { CopilotErrorUX } from '../copilot/CopilotErrorUX';
 import { emitCopilotHttpError } from '@/lib/copilot_error_bus';
 import { parseCopilotHttpErrorSync } from '@/lib/copilot_http_error';
 import { HomeArtifactPanel } from './HomeArtifactPanel';
+import { useStore } from '@/lib/store';
+import { buildAgentContextPacket } from '@/lib/agent_context_packet';
 
 export function ChatFirstHome() {
   const currentSessionId = useSessionStore(state => state.currentSessionId);
@@ -23,10 +25,20 @@ export function ChatFirstHome() {
   const firstSessionId = useSessionStore(state => state.sessions[0]?.session_id ?? null);
   const isHydrated = useSessionStore(state => state.hydrated);
   const actions = useSessionStore(state => state.actions);
+  const { state } = useStore();
   const authToken = process.env.NEXT_PUBLIC_DIVIORA_CONSOLE_AUTH_TOKEN;
   const headers = authToken
     ? { "X-DIVIORA-AUTH": authToken }
     : undefined;
+  const contextPacket = useMemo(
+    () =>
+      buildAgentContextPacket({
+        settings: state.settings,
+        proposals: state.proposals,
+        projectSnapshots: state.projectSnapshots,
+      }),
+    [state.settings, state.proposals, state.projectSnapshots]
+  );
 
   // Ensure an active session exists
   useEffect(() => {
@@ -55,6 +67,7 @@ export function ChatFirstHome() {
                   runtimeUrl="/api/copilot"
                   threadId={currentSessionId || undefined}
                   headers={headers}
+                  properties={{ contextPacket }}
                 >
                     <CopilotErrorUX />
                     <CopilotContextHandler />

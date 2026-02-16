@@ -4,6 +4,7 @@ import { useCopilotReadable, useCopilotAction } from "@copilotkit/react-core";
 import { useStore } from "@/lib/store";
 import { usePathname, useParams } from "next/navigation";
 import { draftPromptSchema, bugTriageFieldsSchema, missingFieldsSchema } from "@/lib/copilot_actions_schema";
+import { getLatestProjectSnapshot, getLatestProposal } from "@/lib/agent_context_packet";
 
 export function CopilotContextHandler() {
   const { state } = useStore();
@@ -17,7 +18,7 @@ export function CopilotContextHandler() {
   });
 
   // 2. Inject Latest Proposal Context
-  const latestProposal = state.proposals[0];
+  const latestProposal = getLatestProposal(state.proposals);
   const latestProposalContext = latestProposal ? {
     proposal_id: latestProposal.proposal_id,
     template_id: latestProposal.proposal.template_id,
@@ -34,6 +35,19 @@ export function CopilotContextHandler() {
   useCopilotReadable({
     description: "The latest draft proposal",
     value: latestProposalContext,
+  });
+
+  const latestProjectSnapshot = getLatestProjectSnapshot(state.projectSnapshots);
+  useCopilotReadable({
+    description: "Latest project memory snapshot markdown",
+    value: latestProjectSnapshot
+      ? {
+          snapshot_id: latestProjectSnapshot.snapshot_id,
+          branch: latestProjectSnapshot.branch ?? null,
+          head_sha: latestProjectSnapshot.head_sha ?? null,
+          raw_markdown: latestProjectSnapshot.raw_markdown,
+        }
+      : null,
   });
 
   // 3. Page specific context
