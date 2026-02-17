@@ -7,6 +7,7 @@ import {
   RunPlan, 
   RunTranscript, 
   ProjectSnapshot,
+  AgentPack,
   Settings, SettingsSchema,
   SnapshotV3, SnapshotV3Schema,
   SnapshotTranscript,
@@ -15,7 +16,8 @@ import {
   DecisionsCollectionSchema,
   RunsCollectionSchema,
   TranscriptsCollectionSchema,
-  ProjectSnapshotsCollectionSchema
+  ProjectSnapshotsCollectionSchema,
+  AgentPacksCollectionSchema
 } from './types';
 import { migrateLocalStorage, migrateSnapshot } from './migrations';
 import { evaluatePolicy, PolicyError } from './policy';
@@ -26,19 +28,22 @@ type State = {
   runs: RunPlan[];
   transcripts: RunTranscript[];
   projectSnapshots: ProjectSnapshot[];
+  agentPacks: AgentPack[];
   settings: Settings;
   metadata: AppMetadata;
   isLoaded: boolean;
 };
 
 type Action =
-  | { type: 'HYDRATE'; proposals: Proposal[]; decisions: Decision[]; runs: RunPlan[]; transcripts: RunTranscript[]; projectSnapshots: ProjectSnapshot[]; settings: Settings; metadata: AppMetadata }
+  | { type: 'HYDRATE'; proposals: Proposal[]; decisions: Decision[]; runs: RunPlan[]; transcripts: RunTranscript[]; projectSnapshots: ProjectSnapshot[]; agentPacks: AgentPack[]; settings: Settings; metadata: AppMetadata }
   | { type: 'ADD_PROPOSAL'; payload: Proposal }
   | { type: 'SET_DECISION'; payload: Decision }
   | { type: 'ADD_RUN'; payload: RunPlan }
   | { type: 'ADD_TRANSCRIPT'; payload: RunTranscript }
   | { type: 'ADD_PROJECT_SNAPSHOT'; payload: ProjectSnapshot }
   | { type: 'DELETE_PROJECT_SNAPSHOT'; snapshot_id: string }
+  | { type: 'ADD_AGENT_PACK'; payload: AgentPack }
+  | { type: 'SET_AGENT_PACK_STATUS'; payload: { pack_id: string; status: AgentPack['status']; note?: string } }
   | { type: 'UPDATE_SETTINGS'; payload: Partial<Settings> }
   | { type: 'UPDATE_METADATA'; payload: Partial<AppMetadata> }
   | { type: 'REPLACE_STATE'; payload: Omit<State, 'isLoaded'> }
@@ -49,6 +54,7 @@ const STORAGE_KEY_DECISIONS = 'diviora.decisions.v1';
 const STORAGE_KEY_RUNS = 'diviora.runs.v1';
 const STORAGE_KEY_TRANSCRIPTS = 'diviora.transcripts.v1';
 const STORAGE_KEY_PROJECT_SNAPSHOTS = 'diviora.project_snapshots.v1';
+const STORAGE_KEY_AGENT_PACKS = 'diviora.agent_packs.v1';
 const STORAGE_KEY_SETTINGS = 'diviora.settings.v1';
 const STORAGE_KEY_METADATA = 'diviora.metadata.v1';
 
@@ -68,6 +74,7 @@ const initialState: State = {
   runs: [],
   transcripts: [],
   projectSnapshots: [],
+  agentPacks: [],
   settings: defaultSettings,
   metadata: {},
   isLoaded: false,
@@ -153,6 +160,26 @@ function reducer(state: State, action: Action): State {
       return { ...state, projectSnapshots: remainingSnapshots };
     }
 
+    case 'ADD_AGENT_PACK': {
+      const next = [action.payload, ...state.agentPacks];
+      next.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      localStorage.setItem(STORAGE_KEY_AGENT_PACKS, JSON.stringify({ schema_version: 1, items: next }));
+      return { ...state, agentPacks: next };
+    }
+
+    case 'SET_AGENT_PACK_STATUS': {
+      const next = state.agentPacks.map((pack) => {
+        if (pack.pack_id !== action.payload.pack_id) return pack;
+        return {
+          ...pack,
+          status: action.payload.status,
+          note: action.payload.note,
+        };
+      });
+      localStorage.setItem(STORAGE_KEY_AGENT_PACKS, JSON.stringify({ schema_version: 1, items: next }));
+      return { ...state, agentPacks: next };
+    }
+
     case 'UPDATE_SETTINGS': {
       const newSettings = { ...state.settings, ...action.payload };
       localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(newSettings));
@@ -166,12 +193,13 @@ function reducer(state: State, action: Action): State {
     }
 
     case 'REPLACE_STATE': {
-      const { proposals, decisions, runs, transcripts, projectSnapshots, settings, metadata } = action.payload;
+      const { proposals, decisions, runs, transcripts, projectSnapshots, agentPacks, settings, metadata } = action.payload;
       localStorage.setItem(STORAGE_KEY_PROPOSALS, JSON.stringify({ schema_version: 1, items: proposals }));
       localStorage.setItem(STORAGE_KEY_DECISIONS, JSON.stringify({ schema_version: 1, items: decisions }));
       localStorage.setItem(STORAGE_KEY_RUNS, JSON.stringify({ schema_version: 1, items: runs }));
       localStorage.setItem(STORAGE_KEY_TRANSCRIPTS, JSON.stringify({ schema_version: 1, items: transcripts }));
       localStorage.setItem(STORAGE_KEY_PROJECT_SNAPSHOTS, JSON.stringify({ schema_version: 1, items: projectSnapshots }));
+      localStorage.setItem(STORAGE_KEY_AGENT_PACKS, JSON.stringify({ schema_version: 1, items: agentPacks }));
       localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(settings));
       localStorage.setItem(STORAGE_KEY_METADATA, JSON.stringify(metadata));
       return { ...action.payload, isLoaded: true };
@@ -183,10 +211,11 @@ function reducer(state: State, action: Action): State {
       localStorage.removeItem(STORAGE_KEY_RUNS);
       localStorage.removeItem(STORAGE_KEY_TRANSCRIPTS);
       localStorage.removeItem(STORAGE_KEY_PROJECT_SNAPSHOTS);
+      localStorage.removeItem(STORAGE_KEY_AGENT_PACKS);
       localStorage.removeItem(STORAGE_KEY_SETTINGS);
       localStorage.removeItem(STORAGE_KEY_METADATA);
       localStorage.removeItem('diviora_proposals');
-      return { ...state, proposals: [], decisions: [], runs: [], transcripts: [], projectSnapshots: [], settings: defaultSettings, metadata: {} };
+      return { ...state, proposals: [], decisions: [], runs: [], transcripts: [], projectSnapshots: [], agentPacks: [], settings: defaultSettings, metadata: {} };
     
     default:
       return state;
@@ -201,6 +230,8 @@ const StoreContext = createContext<{
   generateTranscript: (run_id: string, scenarioId?: 'happy_path' | 'flaky_inputs' | 'rate_limited' | 'validation_error', seed?: string) => RunTranscript;
   addProjectSnapshot: (snapshot: ProjectSnapshot) => void;
   deleteProjectSnapshot: (snapshot_id: string) => void;
+  addAgentPack: (pack: AgentPack) => void;
+  setAgentPackStatus: (pack_id: string, status: AgentPack['status'], note?: string) => void;
   updateSettings: (partial: Partial<Settings>) => void;
   resetAllData: () => void;
   exportSnapshot: () => SnapshotV3;
@@ -219,6 +250,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const savedRuns = localStorage.getItem(STORAGE_KEY_RUNS);
       const savedTranscripts = localStorage.getItem(STORAGE_KEY_TRANSCRIPTS);
       const savedProjectSnapshots = localStorage.getItem(STORAGE_KEY_PROJECT_SNAPSHOTS);
+      const savedAgentPacks = localStorage.getItem(STORAGE_KEY_AGENT_PACKS);
       const savedSettings = localStorage.getItem(STORAGE_KEY_SETTINGS);
       const savedMetadata = localStorage.getItem(STORAGE_KEY_METADATA);
       
@@ -227,6 +259,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       let runs: RunPlan[] = [];
       let transcripts: RunTranscript[] = [];
       let projectSnapshots: ProjectSnapshot[] = [];
+      let agentPacks: AgentPack[] = [];
       let settings: Settings = defaultSettings;
       let metadata: AppMetadata = {};
 
@@ -300,7 +333,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         } catch (e) { console.error('Failed to parse project snapshots:', e); }
       }
 
-      dispatch({ type: 'HYDRATE', proposals, decisions, runs, transcripts, projectSnapshots, settings, metadata });
+      if (savedAgentPacks) {
+        try {
+          const parsed = JSON.parse(savedAgentPacks);
+          const result = AgentPacksCollectionSchema.safeParse(parsed);
+          if (result.success) {
+            agentPacks = result.data.items;
+          }
+        } catch (e) { console.error('Failed to parse agent packs:', e); }
+      }
+
+      dispatch({ type: 'HYDRATE', proposals, decisions, runs, transcripts, projectSnapshots, agentPacks, settings, metadata });
     };
 
     loadData();
@@ -309,6 +352,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const addProposal = (payload: Proposal) => dispatch({ type: 'ADD_PROPOSAL', payload });
   const addProjectSnapshot = (payload: ProjectSnapshot) => dispatch({ type: 'ADD_PROJECT_SNAPSHOT', payload });
   const deleteProjectSnapshot = (snapshot_id: string) => dispatch({ type: 'DELETE_PROJECT_SNAPSHOT', snapshot_id });
+  const addAgentPack = (payload: AgentPack) => dispatch({ type: 'ADD_AGENT_PACK', payload });
+  const setAgentPackStatus = (pack_id: string, status: AgentPack['status'], note?: string) =>
+    dispatch({ type: 'SET_AGENT_PACK_STATUS', payload: { pack_id, status, note } });
   const setDecision = (payload: Decision) => {
     const proposal = state.proposals.find(p => p.proposal_id === payload.proposal_id);
     const actionType = payload.status === 'approved' ? 'APPROVE_PROPOSAL' : 'REJECT_PROPOSAL';
@@ -635,6 +681,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
             events: transcript.events,
           })),
           projectSnapshots: state.projectSnapshots,
+          agentPacks: state.agentPacks,
           settings: snapshot.settings,
           metadata: updatedMetadata
         }
@@ -647,7 +694,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <StoreContext.Provider value={{ state, addProposal, setDecision, createRunPlan, generateTranscript, addProjectSnapshot, deleteProjectSnapshot, updateSettings, resetAllData, exportSnapshot, importSnapshot }}>
+    <StoreContext.Provider value={{ state, addProposal, setDecision, createRunPlan, generateTranscript, addProjectSnapshot, deleteProjectSnapshot, addAgentPack, setAgentPackStatus, updateSettings, resetAllData, exportSnapshot, importSnapshot }}>
       {children}
     </StoreContext.Provider>
   );

@@ -89,6 +89,21 @@ describe('CopilotContextHandler authority boundary', () => {
       hints: ['Add steps'],
     });
     await byName('draftNextMessage').handler({ draft: 'legacy draft' });
+    await byName('propose_issue_pack').handler({
+      goal_text: 'Ship agent page',
+      title: 'Issue Pack',
+      content_markdown: '## Objective\nShip',
+    });
+    await byName('propose_review_pack').handler({
+      pr_url_or_branch: 'feature/agent',
+      title: 'Review Pack',
+      content_markdown: '## Objective\nReview',
+    });
+    await byName('propose_manual_test_pack').handler({
+      target_flow: '/agent',
+      title: 'Manual Test Pack',
+      content_markdown: '## Objective\nTest',
+    });
 
     expect(dispatchSpy).toHaveBeenCalled();
     expect(addProposal).not.toHaveBeenCalled();

@@ -4,6 +4,7 @@ const STORAGE_KEY_PROPOSALS = 'diviora.proposals.v1';
 const STORAGE_KEY_DECISIONS = 'diviora.decisions.v1';
 const STORAGE_KEY_RUNS = 'diviora.runs.v1';
 const STORAGE_KEY_PROJECT_SNAPSHOTS = 'diviora.project_snapshots.v1';
+const STORAGE_KEY_AGENT_PACKS = 'diviora.agent_packs.v1';
 
 /**
  * Migrates a snapshot from any supported version to the latest (V3).
@@ -86,7 +87,7 @@ export function migrateLocalStorage(): { ok: true } | { ok: false, error: string
     }
 
     // 2. Migrate raw arrays to { schema_version: 1, items: [] }
-    const keys = [STORAGE_KEY_PROPOSALS, STORAGE_KEY_DECISIONS, STORAGE_KEY_RUNS, STORAGE_KEY_PROJECT_SNAPSHOTS];
+    const keys = [STORAGE_KEY_PROPOSALS, STORAGE_KEY_DECISIONS, STORAGE_KEY_RUNS, STORAGE_KEY_PROJECT_SNAPSHOTS, STORAGE_KEY_AGENT_PACKS];
     for (const key of keys) {
       const data = localStorage.getItem(key);
       if (data) {

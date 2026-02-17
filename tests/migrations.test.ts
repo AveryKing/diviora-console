@@ -96,4 +96,16 @@ describe('Migrations Logic (Issue #9)', () => {
     expect(migrated.schema_version).toBe(1);
     expect(migrated.items).toHaveLength(1);
   });
+
+  it('migrates raw agent packs array to versioned collection', () => {
+    localStorage.clear();
+    const rawPacks = [{ pack_id: 'pack_1', title: 'Pack' }];
+    localStorage.setItem('diviora.agent_packs.v1', JSON.stringify(rawPacks));
+
+    migrateLocalStorage();
+
+    const migrated = JSON.parse(localStorage.getItem('diviora.agent_packs.v1')!);
+    expect(migrated.schema_version).toBe(1);
+    expect(migrated.items).toHaveLength(1);
+  });
 });

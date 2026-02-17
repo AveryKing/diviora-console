@@ -11,11 +11,22 @@ import { CopilotErrorUX } from '../components/copilot/CopilotErrorUX';
 import { buildAgentContextPacket, getLatestProjectSnapshot, getLatestProposal } from '@/lib/agent_context_packet';
 import { ProposalRenderer } from '../components/ProposalRenderer';
 import Link from 'next/link';
+import { AgentPack } from '@/lib/types';
+import { AgentPacksPanel } from '../components/agent/AgentPacksPanel';
+import { ensurePackSections } from '@/lib/agent_pack_template';
 
-type AgentTab = 'memory' | 'proposal' | 'approvals' | 'runs';
+type AgentTab = 'memory' | 'proposal' | 'approvals' | 'runs' | 'packs';
+
+type ProposedAgentPackDraft = {
+  kind: AgentPack['kind'];
+  title: string;
+  content_markdown: string;
+  selected_goals?: string[];
+  source_input: string;
+};
 
 export default function AgentPage() {
-  const { state, updateSettings } = useStore();
+  const { state, updateSettings, addAgentPack, setAgentPackStatus } = useStore();
   const currentSessionId = useSessionStore((s) => s.currentSessionId);
   const hasSessions = useSessionStore((s) => s.sessions.length > 0);
   const firstSessionId = useSessionStore((s) => s.sessions[0]?.session_id ?? null);
@@ -26,6 +37,7 @@ export default function AgentPage() {
   const headers = authToken ? { 'X-DIVIORA-AUTH': authToken } : undefined;
 
   const [tab, setTab] = useState<AgentTab>('memory');
+  const [proposedPackDraft, setProposedPackDraft] = useState<ProposedAgentPackDraft | null>(null);
   const viewMode = state.settings.agent_view_mode ?? 'split';
 
   useEffect(() => {
@@ -38,6 +50,18 @@ export default function AgentPage() {
       }
     }
   }, [sessionsHydrated, currentSessionId, hasSessions, firstSessionId, sessionActions]);
+
+  useEffect(() => {
+    const onProposedPack = (event: Event) => {
+      const customEvent = event as CustomEvent<ProposedAgentPackDraft>;
+      if (!customEvent.detail) return;
+      setTab('packs');
+      setProposedPackDraft(customEvent.detail);
+    };
+
+    window.addEventListener('diviora:agent-pack-proposed', onProposedPack as EventListener);
+    return () => window.removeEventListener('diviora:agent-pack-proposed', onProposedPack as EventListener);
+  }, []);
 
   const contextPacket = useMemo(
     () =>
@@ -55,6 +79,27 @@ export default function AgentPage() {
   const onToggleViewMode = () => {
     const nextMode: 'split' | 'focus' = viewMode === 'split' ? 'focus' : 'split';
     updateSettings({ agent_view_mode: nextMode });
+  };
+
+  const createDraftPack = () => {
+    if (!proposedPackDraft) return;
+    addAgentPack({
+      pack_id: `pack_${Math.random().toString(36).slice(2, 11)}`,
+      created_at: new Date().toISOString(),
+      kind: proposedPackDraft.kind,
+      title: proposedPackDraft.title,
+      content_markdown: ensurePackSections(proposedPackDraft.content_markdown),
+      inputs: {
+        snapshot_id: latestSnapshot?.snapshot_id,
+        selected_goals: proposedPackDraft.selected_goals ?? [proposedPackDraft.source_input],
+      },
+      status: 'draft',
+    });
+    setProposedPackDraft(null);
+  };
+
+  const setPackStatus = (pack_id: string, status: AgentPack['status'], note?: string) => {
+    setAgentPackStatus(pack_id, status, note);
   };
 
   if (!state.isLoaded || !sessionsHydrated) {
@@ -112,6 +157,7 @@ export default function AgentPage() {
               <TabButton tab={tab} value="proposal" onClick={setTab} label="Proposal" testId="agent-tab-proposal" />
               <TabButton tab={tab} value="approvals" onClick={setTab} label="Approvals" testId="agent-tab-approvals" />
               <TabButton tab={tab} value="runs" onClick={setTab} label="Runs" testId="agent-tab-runs" />
+              <TabButton tab={tab} value="packs" onClick={setTab} label="Packs" testId="agent-tab-packs" />
             </div>
           </div>
 
@@ -179,6 +225,16 @@ export default function AgentPage() {
                   ))
                 )}
               </div>
+            )}
+
+            {tab === 'packs' && (
+              <AgentPacksPanel
+                packs={state.agentPacks}
+                latestSnapshotId={latestSnapshot?.snapshot_id}
+                proposedDraft={proposedPackDraft}
+                onCreateDraftPack={createDraftPack}
+                onSetStatus={setPackStatus}
+              />
             )}
           </div>
         </aside>
