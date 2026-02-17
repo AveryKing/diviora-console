@@ -10,7 +10,7 @@ describe('agent packs store persistence', () => {
     localStorage.clear();
   });
 
-  it('stores and updates agent pack status', async () => {
+  it('stores status updates and codex task packets', async () => {
     const source = renderHook(() => useStore(), { wrapper });
     await waitFor(() => expect(source.result.current.state.isLoaded).toBe(true));
 
@@ -30,9 +30,14 @@ describe('agent packs store persistence', () => {
       source.result.current.setAgentPackStatus('pack_1', 'approved', 'ok');
     });
 
+    act(() => {
+      source.result.current.setAgentPackCodexTaskPacket('pack_1', '# CODEX_TASK_PACKET');
+    });
+
     const restored = renderHook(() => useStore(), { wrapper });
     await waitFor(() => expect(restored.result.current.state.isLoaded).toBe(true));
-    expect(restored.result.current.state.agentPacks[0].status).toBe('approved');
+    expect(restored.result.current.state.agentPacks[0].status).toBe('dispatched');
     expect(restored.result.current.state.agentPacks[0].note).toBe('ok');
+    expect(restored.result.current.state.agentPacks[0].codex_task_packet_markdown).toBe('# CODEX_TASK_PACKET');
   });
 });

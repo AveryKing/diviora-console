@@ -241,8 +241,9 @@ export const AgentPackSchema = z.object({
   title: z.string(),
   content_markdown: z.string(),
   inputs: AgentPackInputSchema,
-  status: z.enum(['draft', 'approved', 'rejected']),
+  status: z.enum(['draft', 'approved', 'rejected', 'dispatched']),
   note: z.string().optional(),
+  codex_task_packet_markdown: z.string().optional(),
 });
 
 export type AgentPack = z.infer<typeof AgentPackSchema>;
