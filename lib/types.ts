@@ -227,6 +227,31 @@ export const ProjectSnapshotsCollectionSchema = z.object({
   items: z.array(ProjectSnapshotSchema),
 });
 
+export const AgentPackInputSchema = z.object({
+  snapshot_id: z.string().optional(),
+  selected_goals: z.array(z.string()).optional(),
+});
+
+export type AgentPackInput = z.infer<typeof AgentPackInputSchema>;
+
+export const AgentPackSchema = z.object({
+  pack_id: z.string(),
+  created_at: z.string(),
+  kind: z.enum(['issue', 'review', 'manual_test']),
+  title: z.string(),
+  content_markdown: z.string(),
+  inputs: AgentPackInputSchema,
+  status: z.enum(['draft', 'approved', 'rejected']),
+  note: z.string().optional(),
+});
+
+export type AgentPack = z.infer<typeof AgentPackSchema>;
+
+export const AgentPacksCollectionSchema = z.object({
+  schema_version: z.literal(1),
+  items: z.array(AgentPackSchema),
+});
+
 export const PolicyDecisionSchema = z.object({
   allowed: z.boolean(),
   reasons: z.array(z.string()),

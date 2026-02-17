@@ -3,8 +3,25 @@
 import { useCopilotReadable, useCopilotAction } from "@copilotkit/react-core";
 import { useStore } from "@/lib/store";
 import { usePathname, useParams } from "next/navigation";
-import { draftPromptSchema, bugTriageFieldsSchema, missingFieldsSchema } from "@/lib/copilot_actions_schema";
+import {
+  draftPromptSchema,
+  bugTriageFieldsSchema,
+  missingFieldsSchema,
+  issuePackProposalSchema,
+  reviewPackProposalSchema,
+  manualTestPackProposalSchema,
+} from "@/lib/copilot_actions_schema";
 import { getLatestProjectSnapshot, getLatestProposal } from "@/lib/agent_context_packet";
+
+type ProposedAgentPackKind = 'issue' | 'review' | 'manual_test';
+
+type ProposedAgentPackEvent = {
+  kind: ProposedAgentPackKind;
+  title: string;
+  content_markdown: string;
+  selected_goals?: string[];
+  source_input: string;
+};
 
 export function CopilotContextHandler() {
   const { state } = useStore();
@@ -149,6 +166,75 @@ export function CopilotContextHandler() {
     ],
     handler: async ({ draft }) => {
       window.dispatchEvent(new CustomEvent('diviora:copilot-draft', { detail: { draft } }));
+    },
+  });
+
+  useCopilotAction({
+    name: "propose_issue_pack",
+    description: "Propose an issue pack draft from a user goal.",
+    parameters: [
+      { name: "goal_text", type: "string", required: true },
+      { name: "title", type: "string", required: true },
+      { name: "content_markdown", type: "string", required: true },
+      { name: "selected_goals", type: "string[]" },
+    ],
+    handler: async (data) => {
+      const result = issuePackProposalSchema.safeParse(data);
+      if (!result.success) throw new Error("Invalid issue pack proposal");
+      const payload: ProposedAgentPackEvent = {
+        kind: "issue",
+        title: result.data.title,
+        content_markdown: result.data.content_markdown,
+        selected_goals: result.data.selected_goals,
+        source_input: result.data.goal_text,
+      };
+      window.dispatchEvent(new CustomEvent("diviora:agent-pack-proposed", { detail: payload }));
+    },
+  });
+
+  useCopilotAction({
+    name: "propose_review_pack",
+    description: "Propose a review pack draft from a PR URL or branch.",
+    parameters: [
+      { name: "pr_url_or_branch", type: "string", required: true },
+      { name: "title", type: "string", required: true },
+      { name: "content_markdown", type: "string", required: true },
+      { name: "selected_goals", type: "string[]" },
+    ],
+    handler: async (data) => {
+      const result = reviewPackProposalSchema.safeParse(data);
+      if (!result.success) throw new Error("Invalid review pack proposal");
+      const payload: ProposedAgentPackEvent = {
+        kind: "review",
+        title: result.data.title,
+        content_markdown: result.data.content_markdown,
+        selected_goals: result.data.selected_goals,
+        source_input: result.data.pr_url_or_branch,
+      };
+      window.dispatchEvent(new CustomEvent("diviora:agent-pack-proposed", { detail: payload }));
+    },
+  });
+
+  useCopilotAction({
+    name: "propose_manual_test_pack",
+    description: "Propose a manual test pack draft for a target flow.",
+    parameters: [
+      { name: "target_flow", type: "string", required: true },
+      { name: "title", type: "string", required: true },
+      { name: "content_markdown", type: "string", required: true },
+      { name: "selected_goals", type: "string[]" },
+    ],
+    handler: async (data) => {
+      const result = manualTestPackProposalSchema.safeParse(data);
+      if (!result.success) throw new Error("Invalid manual test pack proposal");
+      const payload: ProposedAgentPackEvent = {
+        kind: "manual_test",
+        title: result.data.title,
+        content_markdown: result.data.content_markdown,
+        selected_goals: result.data.selected_goals,
+        source_input: result.data.target_flow,
+      };
+      window.dispatchEvent(new CustomEvent("diviora:agent-pack-proposed", { detail: payload }));
     },
   });
 

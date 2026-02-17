@@ -36,3 +36,25 @@ export const missingFieldsSchema = z.object({
 });
 
 export type MissingFieldsOutput = z.infer<typeof missingFieldsSchema>;
+
+const basePackProposalSchema = z.object({
+  title: z.string().min(1),
+  content_markdown: z.string().min(1),
+  selected_goals: z.array(z.string()).optional(),
+});
+
+export const issuePackProposalSchema = basePackProposalSchema.extend({
+  goal_text: z.string().min(1),
+});
+
+export const reviewPackProposalSchema = basePackProposalSchema.extend({
+  pr_url_or_branch: z.string().min(1),
+});
+
+export const manualTestPackProposalSchema = basePackProposalSchema.extend({
+  target_flow: z.string().min(1),
+});
+
+export type IssuePackProposalOutput = z.infer<typeof issuePackProposalSchema>;
+export type ReviewPackProposalOutput = z.infer<typeof reviewPackProposalSchema>;
+export type ManualTestPackProposalOutput = z.infer<typeof manualTestPackProposalSchema>;
