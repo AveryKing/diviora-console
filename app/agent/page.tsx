@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { AgentPack } from '@/lib/types';
 import { AgentPacksPanel } from '../components/agent/AgentPacksPanel';
 import { ensurePackSections } from '@/lib/agent_pack_template';
+import { generateCodexTaskPacket } from '@/lib/codex_task_packet';
 
 type AgentTab = 'memory' | 'proposal' | 'approvals' | 'runs' | 'packs';
 
@@ -26,7 +27,7 @@ type ProposedAgentPackDraft = {
 };
 
 export default function AgentPage() {
-  const { state, updateSettings, addAgentPack, setAgentPackStatus } = useStore();
+  const { state, updateSettings, addAgentPack, setAgentPackStatus, setAgentPackCodexTaskPacket } = useStore();
   const currentSessionId = useSessionStore((s) => s.currentSessionId);
   const hasSessions = useSessionStore((s) => s.sessions.length > 0);
   const firstSessionId = useSessionStore((s) => s.sessions[0]?.session_id ?? null);
@@ -100,6 +101,13 @@ export default function AgentPage() {
 
   const setPackStatus = (pack_id: string, status: AgentPack['status'], note?: string) => {
     setAgentPackStatus(pack_id, status, note);
+  };
+
+  const onGenerateCodexTaskPacket = (pack_id: string) => {
+    const pack = state.agentPacks.find((candidate) => candidate.pack_id === pack_id);
+    if (!pack) return;
+    if (pack.kind !== 'issue' || pack.status !== 'approved') return;
+    setAgentPackCodexTaskPacket(pack.pack_id, generateCodexTaskPacket(pack));
   };
 
   if (!state.isLoaded || !sessionsHydrated) {
@@ -234,6 +242,7 @@ export default function AgentPage() {
                 proposedDraft={proposedPackDraft}
                 onCreateDraftPack={createDraftPack}
                 onSetStatus={setPackStatus}
+                onGenerateCodexTaskPacket={onGenerateCodexTaskPacket}
               />
             )}
           </div>

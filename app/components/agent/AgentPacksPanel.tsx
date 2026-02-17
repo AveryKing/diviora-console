@@ -17,11 +17,13 @@ type AgentPacksPanelProps = {
   proposedDraft: ProposedAgentPackDraft | null;
   onCreateDraftPack: () => void;
   onSetStatus: (pack_id: string, status: AgentPack['status'], note?: string) => void;
+  onGenerateCodexTaskPacket: (pack_id: string) => void;
 };
 
 function statusStyle(status: AgentPack['status']): string {
   if (status === 'approved') return 'bg-green-100 text-green-800 border-green-200';
   if (status === 'rejected') return 'bg-red-100 text-red-800 border-red-200';
+  if (status === 'dispatched') return 'bg-blue-100 text-blue-800 border-blue-200';
   return 'bg-gray-100 text-gray-800 border-gray-200';
 }
 
@@ -31,6 +33,7 @@ export function AgentPacksPanel({
   proposedDraft,
   onCreateDraftPack,
   onSetStatus,
+  onGenerateCodexTaskPacket,
 }: AgentPacksPanelProps) {
   const [selectedPackId, setSelectedPackId] = useState<string | null>(packs[0]?.pack_id ?? null);
   const [noteInput, setNoteInput] = useState('');
@@ -118,6 +121,15 @@ export function AgentPacksPanel({
                 >
                   Copy markdown
                 </button>
+                {selectedPack.kind === 'issue' && selectedPack.status === 'approved' && (
+                  <button
+                    data-testid="agent-pack-generate-codex-task-packet"
+                    onClick={() => onGenerateCodexTaskPacket(selectedPack.pack_id)}
+                    className="rounded border border-blue-300 px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                  >
+                    Generate Codex Task Packet
+                  </button>
+                )}
               </div>
 
               <textarea
@@ -148,6 +160,23 @@ export function AgentPacksPanel({
               <pre className="mt-3 max-h-[320px] overflow-auto whitespace-pre-wrap rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-800">
                 {selectedPack.content_markdown}
               </pre>
+              {selectedPack.codex_task_packet_markdown && (
+                <>
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="text-xs font-semibold text-gray-700">Codex Task Packet</div>
+                    <button
+                      data-testid="agent-pack-copy-codex-task-packet"
+                      onClick={() => void navigator.clipboard.writeText(selectedPack.codex_task_packet_markdown ?? '')}
+                      className="rounded border border-gray-300 px-2 py-1 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                    >
+                      Copy packet
+                    </button>
+                  </div>
+                  <pre data-testid="agent-pack-codex-task-packet" className="mt-2 max-h-[320px] overflow-auto whitespace-pre-wrap rounded border border-blue-200 bg-blue-50 p-2 text-xs text-blue-900">
+                    {selectedPack.codex_task_packet_markdown}
+                  </pre>
+                </>
+              )}
             </>
           )}
         </div>

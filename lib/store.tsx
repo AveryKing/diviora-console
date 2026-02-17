@@ -44,6 +44,7 @@ type Action =
   | { type: 'DELETE_PROJECT_SNAPSHOT'; snapshot_id: string }
   | { type: 'ADD_AGENT_PACK'; payload: AgentPack }
   | { type: 'SET_AGENT_PACK_STATUS'; payload: { pack_id: string; status: AgentPack['status']; note?: string } }
+  | { type: 'SET_AGENT_PACK_CODEX_PACKET'; payload: { pack_id: string; codex_task_packet_markdown: string } }
   | { type: 'UPDATE_SETTINGS'; payload: Partial<Settings> }
   | { type: 'UPDATE_METADATA'; payload: Partial<AppMetadata> }
   | { type: 'REPLACE_STATE'; payload: Omit<State, 'isLoaded'> }
@@ -180,6 +181,19 @@ function reducer(state: State, action: Action): State {
       return { ...state, agentPacks: next };
     }
 
+    case 'SET_AGENT_PACK_CODEX_PACKET': {
+      const next = state.agentPacks.map((pack) => {
+        if (pack.pack_id !== action.payload.pack_id) return pack;
+        return {
+          ...pack,
+          codex_task_packet_markdown: action.payload.codex_task_packet_markdown,
+          status: 'dispatched' as const,
+        };
+      });
+      localStorage.setItem(STORAGE_KEY_AGENT_PACKS, JSON.stringify({ schema_version: 1, items: next }));
+      return { ...state, agentPacks: next };
+    }
+
     case 'UPDATE_SETTINGS': {
       const newSettings = { ...state.settings, ...action.payload };
       localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(newSettings));
@@ -232,6 +246,7 @@ const StoreContext = createContext<{
   deleteProjectSnapshot: (snapshot_id: string) => void;
   addAgentPack: (pack: AgentPack) => void;
   setAgentPackStatus: (pack_id: string, status: AgentPack['status'], note?: string) => void;
+  setAgentPackCodexTaskPacket: (pack_id: string, codex_task_packet_markdown: string) => void;
   updateSettings: (partial: Partial<Settings>) => void;
   resetAllData: () => void;
   exportSnapshot: () => SnapshotV3;
@@ -355,6 +370,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const addAgentPack = (payload: AgentPack) => dispatch({ type: 'ADD_AGENT_PACK', payload });
   const setAgentPackStatus = (pack_id: string, status: AgentPack['status'], note?: string) =>
     dispatch({ type: 'SET_AGENT_PACK_STATUS', payload: { pack_id, status, note } });
+  const setAgentPackCodexTaskPacket = (pack_id: string, codex_task_packet_markdown: string) =>
+    dispatch({ type: 'SET_AGENT_PACK_CODEX_PACKET', payload: { pack_id, codex_task_packet_markdown } });
   const setDecision = (payload: Decision) => {
     const proposal = state.proposals.find(p => p.proposal_id === payload.proposal_id);
     const actionType = payload.status === 'approved' ? 'APPROVE_PROPOSAL' : 'REJECT_PROPOSAL';
@@ -694,7 +711,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <StoreContext.Provider value={{ state, addProposal, setDecision, createRunPlan, generateTranscript, addProjectSnapshot, deleteProjectSnapshot, addAgentPack, setAgentPackStatus, updateSettings, resetAllData, exportSnapshot, importSnapshot }}>
+    <StoreContext.Provider value={{ state, addProposal, setDecision, createRunPlan, generateTranscript, addProjectSnapshot, deleteProjectSnapshot, addAgentPack, setAgentPackStatus, setAgentPackCodexTaskPacket, updateSettings, resetAllData, exportSnapshot, importSnapshot }}>
       {children}
     </StoreContext.Provider>
   );
