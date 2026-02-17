@@ -38,6 +38,7 @@ yarn-error.log*
 
 # codex workflow hygiene
 CODEX_MANUAL_REPORT.md
+CODEX_MANUAL_RUN_REPORT.md
 STATE_SNAPSHOT.md
 AUDIT_GRADE_*.md
 reports/

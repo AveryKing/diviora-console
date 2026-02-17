@@ -15,8 +15,9 @@ function readCopilotKitVersion(): string {
   return "unknown";
 }
 
-const RATE_LIMIT_COUNT = 30;
-const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const isLocalDev = process.env.NODE_ENV === "development";
+const RATE_LIMIT_COUNT = Number(process.env.DIVIORA_COPILOT_RATE_LIMIT_COUNT ?? (isLocalDev ? "1000" : "30"));
+const RATE_LIMIT_WINDOW_MS = Number(process.env.DIVIORA_COPILOT_RATE_LIMIT_WINDOW_MS ?? (isLocalDev ? "60000" : String(10 * 60 * 1000)));
 const MAX_MESSAGE_LENGTH = 8000;
 const MAX_HISTORY_MESSAGES = 200;
 const DEFAULT_UPSTREAM_TIMEOUT_MS = 20_000;
@@ -48,6 +49,11 @@ function getClientKey(req: NextRequest): string {
   const reqWithIp = req as NextRequest & { ip?: string };
   if (reqWithIp.ip) return reqWithIp.ip;
   return "unknown";
+}
+
+function shouldBypassRateLimit(clientKey: string): boolean {
+  if (!isLocalDev) return false;
+  return clientKey === "127.0.0.1" || clientKey === "::1" || clientKey === "localhost" || clientKey === "unknown";
 }
 
 function normalizeText(value: unknown): string {
@@ -164,11 +170,13 @@ export const POST = async (req: NextRequest) => {
   }
 
   const clientKey = getClientKey(req);
-  const rate = limiter.check(clientKey);
-  if (!rate.allowed) {
-    return jsonError(429, "rate_limited", {
-      "Retry-After": String(rate.retryAfterSeconds),
-    });
+  if (!shouldBypassRateLimit(clientKey)) {
+    const rate = limiter.check(clientKey);
+    if (!rate.allowed) {
+      return jsonError(429, "rate_limited", {
+        "Retry-After": String(rate.retryAfterSeconds),
+      });
+    }
   }
 
   const payloadCheck = validatePayload(parsedBody);

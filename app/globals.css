@@ -22,5 +22,45 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+html,
+body {
+  overflow-x: hidden;
+}
+
+cpk-web-inspector {
+  pointer-events: none !important;
+}
+
+.agent-shell .copilotKitChat {
+  --copilot-kit-primary-color: #22d3ee;
+  --copilot-kit-contrast-color: #031018;
+  --copilot-kit-background-color: transparent;
+  --copilot-kit-input-background-color: #090d14;
+  --copilot-kit-secondary-color: #0f172a;
+  --copilot-kit-secondary-contrast-color: #e2e8f0;
+  --copilot-kit-separator-color: #27272a;
+  --copilot-kit-muted-color: #94a3b8;
+  --copilot-kit-error-background: rgba(185, 28, 28, 0.15);
+  --copilot-kit-error-border: rgba(248, 113, 113, 0.45);
+  --copilot-kit-error-text: #fecaca;
+  --copilot-kit-shadow-sm: none;
+  --copilot-kit-shadow-md: none;
+  --copilot-kit-shadow-lg: none;
+}
+
+.agent-shell .copilotKitChat .copilotKitMessages {
+  background: linear-gradient(180deg, rgba(9, 13, 20, 0.65) 0%, rgba(9, 13, 20, 0.35) 100%);
+}
+
+.agent-shell .copilotKitChat .copilotKitHeader {
+  background: rgba(9, 13, 20, 0.96);
+  border-bottom: 1px solid rgba(39, 39, 42, 0.95);
+}
+
+.agent-shell .copilotKitChat .copilotKitInput {
+  border-top: 1px solid rgba(39, 39, 42, 0.95);
+  background: rgba(9, 13, 20, 0.92);
 }

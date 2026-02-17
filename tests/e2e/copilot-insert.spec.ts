@@ -15,6 +15,12 @@ test.describe('Copilot Insert (Optional C)', () => {
   });
 
   test('no-submit on insert', async ({ page }) => {
+    let compileRequestCount = 0;
+    await page.route('**/api/compile', async (route) => {
+      compileRequestCount += 1;
+      await route.continue();
+    });
+
     // 2. Open Copilot Sidebar (if closed initially, toggle button might not be visible depending on screen size, assuming desktop default visible or toggle)
     // Wait, sidebar is inside the page. Let's make sure we can trigger the draft event.
     
@@ -35,13 +41,15 @@ test.describe('Copilot Insert (Optional C)', () => {
     const textarea = page.getByTestId('home-compose-textarea');
     await expect(textarea).toHaveValue('Mock Draft Suggestion');
 
-    // 7. Assert NO compilation request fired (fail-closed check)
-    // We can check if we navigated away or if a network request happened.
-    // Since compilation navigates to /compile or /proposal/[id], staying on / is a good sign.
+    // 7. Assert NO compilation request fired before explicit submit
+    expect(compileRequestCount).toBe(0);
+
+    // Since compilation navigates to artifact pages, staying on / is a secondary check.
     await expect(page).toHaveURL('/');
     
     // Also, check that the "Compile" button is still visible and enabled/clickable needed to submit manually.
     const compileBtn = page.getByTestId('home-compose-submit');
     await expect(compileBtn).toBeVisible();
+    await expect(compileBtn).toBeEnabled();
   });
 });

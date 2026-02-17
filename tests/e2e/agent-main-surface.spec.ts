@@ -15,10 +15,10 @@ test.describe('Agent Main Surface', () => {
     await expect(page.getByTestId('agent-chat-main')).toBeVisible();
     await expect(page.getByTestId('agent-right-panel')).toBeVisible();
 
-    await page.click('[data-testid="agent-focus-toggle"]');
+    await page.click('[data-testid="agent-focus-toggle"]', { force: true });
     await expect(page.getByTestId('agent-right-panel')).toBeHidden();
 
-    await page.click('[data-testid="agent-focus-toggle"]');
+    await page.click('[data-testid="agent-focus-toggle"]', { force: true });
     await expect(page.getByTestId('agent-right-panel')).toBeVisible();
   });
 

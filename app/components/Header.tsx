@@ -17,6 +17,9 @@ const navLinks = [
 
 export default function Header() {
   const pathname = usePathname()
+  if (pathname?.startsWith('/agent')) {
+    return null
+  }
 
   return (
     <header className="border-b border-gray-200 bg-white">

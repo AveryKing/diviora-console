@@ -233,6 +233,7 @@ export default function SettingsPage() {
             <div className="md:col-span-2 flex gap-4">
               <button
                 onClick={handleExport}
+                data-testid="settings-export-snapshot"
                 className="flex-1 flex items-center justify-center gap-2 p-3 text-sm font-bold border border-gray-200 rounded-xl hover:bg-gray-50 transition-all active:scale-95"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -242,6 +243,7 @@ export default function SettingsPage() {
               </button>
               <button
                 onClick={handleImportClick}
+                data-testid="settings-import-snapshot"
                 className="flex-1 flex items-center justify-center gap-2 p-3 text-sm font-bold border border-gray-200 rounded-xl hover:bg-gray-50 transition-all active:scale-95"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -254,6 +256,7 @@ export default function SettingsPage() {
                 ref={fileInputRef}
                 onChange={handleFileChange}
                 accept=".json"
+                data-testid="settings-import-file-input"
                 className="hidden"
               />
             </div>
