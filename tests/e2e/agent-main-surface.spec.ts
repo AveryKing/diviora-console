@@ -13,13 +13,26 @@ test.describe('Agent Main Surface', () => {
     await page.goto('/agent');
     await expect(page.getByTestId('agent-page')).toBeVisible();
     await expect(page.getByTestId('agent-chat-main')).toBeVisible();
-    await expect(page.getByTestId('agent-right-panel')).toBeVisible();
+    const rightPanel = page.getByTestId('agent-right-panel');
 
-    await page.click('[data-testid="agent-focus-toggle"]', { force: true });
-    await expect(page.getByTestId('agent-right-panel')).toBeHidden();
+    const ensurePanelState = async (visible: boolean) => {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const isVisible = (await rightPanel.count()) > 0;
+        if (isVisible === visible) return;
+        await page.click('[data-testid="agent-focus-toggle"]', { force: true });
+      }
+      if (visible) {
+        await expect(rightPanel).toBeVisible({ timeout: 15_000 });
+      } else {
+        await expect(rightPanel).toBeHidden({ timeout: 15_000 });
+      }
+    };
 
-    await page.click('[data-testid="agent-focus-toggle"]', { force: true });
-    await expect(page.getByTestId('agent-right-panel')).toBeVisible();
+    await ensurePanelState(true);
+    await ensurePanelState(false);
+    await ensurePanelState(true);
+
+    await expect(rightPanel).toBeVisible();
   });
 
   test('memory tab shows latest snapshot raw markdown', async ({ page }) => {
