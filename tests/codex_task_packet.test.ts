@@ -23,6 +23,7 @@ describe('generateCodexTaskPacket', () => {
       ].join('\n'),
       inputs: { snapshot_id: 'snap_1', selected_goals: ['goal'] },
       status: 'approved',
+      approval_note: 'approved note',
     };
 
     const first = generateCodexTaskPacket(pack);

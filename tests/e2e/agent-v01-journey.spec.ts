@@ -70,7 +70,7 @@ test.describe('Diviora Agent v0.1 Journey', () => {
     await expect(page.getByTestId('agent-pack-status-badge')).toContainText('approved');
 
     await page.click('[data-testid="agent-pack-generate-codex-task-packet"]');
-    await expect(page.getByTestId('agent-pack-status-badge')).toContainText('dispatched');
+    await expect(page.getByTestId('agent-pack-status-badge')).toContainText('approved');
     await expect(page.getByTestId('agent-pack-codex-task-packet')).toContainText('## Invariants (from AGENTS.md)');
     await expect(page.getByTestId('agent-pack-codex-task-packet')).toContainText('Suggested branch: codex/issue-pack-agent-v0-1-sanity');
   });

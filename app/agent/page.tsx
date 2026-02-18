@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { CopilotKit } from '@copilotkit/react-core';
 import '@copilotkit/react-ui/styles.css';
 import dynamic from 'next/dynamic';
-import { Bot, ChevronsLeft, ChevronsRight, FolderKanban, Home, MemoryStick, Scale, Settings, Workflow } from 'lucide-react';
+import { Bot, ChevronsLeft, ChevronsRight, FolderKanban, Home, ListChecks, MemoryStick, ReceiptText, Scale, Settings, Workflow } from 'lucide-react';
 import { useStore } from '@/lib/store';
 import { useSessionStore } from '@/lib/session_store';
 import { CopilotContextHandler } from '../components/CopilotContextHandler';
@@ -42,6 +42,8 @@ const shellLinks = [
   { href: '/', label: 'Home', icon: Home },
   { href: '/artifacts', label: 'Artifacts', icon: FolderKanban },
   { href: '/approvals', label: 'Approvals', icon: Scale },
+  { href: '/queue', label: 'Queue', icon: ListChecks },
+  { href: '/dispatch', label: 'Dispatch', icon: ReceiptText },
   { href: '/runs', label: 'Runs', icon: Workflow },
   { href: '/memory', label: 'Memory', icon: MemoryStick },
   { href: '/settings', label: 'Settings', icon: Settings },
@@ -114,6 +116,7 @@ export default function AgentPage() {
       content_markdown: ensurePackSections(proposedPackDraft.content_markdown),
       inputs: {
         snapshot_id: latestSnapshot?.snapshot_id,
+        proposal_id: latestProposal?.proposal_id,
         selected_goals: proposedPackDraft.selected_goals ?? [proposedPackDraft.source_input],
       },
       status: 'draft',
