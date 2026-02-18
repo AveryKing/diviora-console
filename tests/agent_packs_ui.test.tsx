@@ -60,6 +60,7 @@ describe('AgentPacksPanel', () => {
       content_markdown: '## Objective\\nTest',
       inputs: {},
       status: 'approved',
+      approval_note: 'approved note',
     };
 
     const reviewApproved: AgentPack = {
@@ -70,6 +71,7 @@ describe('AgentPacksPanel', () => {
       content_markdown: '## Objective\\nTest',
       inputs: {},
       status: 'approved',
+      approval_note: 'approved note',
     };
 
     const draftIssue: AgentPack = {

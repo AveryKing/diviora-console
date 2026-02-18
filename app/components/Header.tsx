@@ -8,6 +8,8 @@ const navLinks = [
   { href: '/', label: 'Home' },
   { href: '/artifacts', label: 'Artifacts' },
   { href: '/approvals', label: 'Approvals' },
+  { href: '/queue', label: 'Queue' },
+  { href: '/dispatch', label: 'Dispatch' },
   { href: '/runs', label: 'Runs' },
   { href: '/memory', label: 'Memory' },
   { href: '/policies', label: 'Policies' },

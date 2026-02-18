@@ -17,10 +17,15 @@ import {
   RunsCollectionSchema,
   TranscriptsCollectionSchema,
   ProjectSnapshotsCollectionSchema,
-  AgentPacksCollectionSchema
+  AgentPacksCollectionSchema,
+  DispatchRecord,
+  DispatchDestination,
+  DispatchStatus,
+  DispatchRecordsCollectionSchema
 } from './types';
 import { migrateLocalStorage, migrateSnapshot } from './migrations';
 import { evaluatePolicy, PolicyError } from './policy';
+import { buildDispatchId, sha256Hex } from './dispatch';
 
 type State = {
   proposals: Proposal[];
@@ -29,13 +34,14 @@ type State = {
   transcripts: RunTranscript[];
   projectSnapshots: ProjectSnapshot[];
   agentPacks: AgentPack[];
+  dispatchRecords: DispatchRecord[];
   settings: Settings;
   metadata: AppMetadata;
   isLoaded: boolean;
 };
 
 type Action =
-  | { type: 'HYDRATE'; proposals: Proposal[]; decisions: Decision[]; runs: RunPlan[]; transcripts: RunTranscript[]; projectSnapshots: ProjectSnapshot[]; agentPacks: AgentPack[]; settings: Settings; metadata: AppMetadata }
+  | { type: 'HYDRATE'; proposals: Proposal[]; decisions: Decision[]; runs: RunPlan[]; transcripts: RunTranscript[]; projectSnapshots: ProjectSnapshot[]; agentPacks: AgentPack[]; dispatchRecords: DispatchRecord[]; settings: Settings; metadata: AppMetadata }
   | { type: 'ADD_PROPOSAL'; payload: Proposal }
   | { type: 'SET_DECISION'; payload: Decision }
   | { type: 'ADD_RUN'; payload: RunPlan }
@@ -43,8 +49,10 @@ type Action =
   | { type: 'ADD_PROJECT_SNAPSHOT'; payload: ProjectSnapshot }
   | { type: 'DELETE_PROJECT_SNAPSHOT'; snapshot_id: string }
   | { type: 'ADD_AGENT_PACK'; payload: AgentPack }
-  | { type: 'SET_AGENT_PACK_STATUS'; payload: { pack_id: string; status: AgentPack['status']; note?: string } }
+  | { type: 'SET_AGENT_PACK_STATUS'; payload: { pack_id: string; status: AgentPack['status']; approval_note?: string } }
   | { type: 'SET_AGENT_PACK_CODEX_PACKET'; payload: { pack_id: string; codex_task_packet_markdown: string } }
+  | { type: 'ADD_DISPATCH_RECORD'; payload: DispatchRecord }
+  | { type: 'UPDATE_DISPATCH_STATUS'; payload: { dispatch_id: string; nextStatus: DispatchStatus; error?: string } }
   | { type: 'UPDATE_SETTINGS'; payload: Partial<Settings> }
   | { type: 'UPDATE_METADATA'; payload: Partial<AppMetadata> }
   | { type: 'REPLACE_STATE'; payload: Omit<State, 'isLoaded'> }
@@ -56,6 +64,7 @@ const STORAGE_KEY_RUNS = 'diviora.runs.v1';
 const STORAGE_KEY_TRANSCRIPTS = 'diviora.transcripts.v1';
 const STORAGE_KEY_PROJECT_SNAPSHOTS = 'diviora.project_snapshots.v1';
 const STORAGE_KEY_AGENT_PACKS = 'diviora.agent_packs.v1';
+const STORAGE_KEY_DISPATCH_RECORDS = 'diviora.dispatch_records.v1';
 const STORAGE_KEY_SETTINGS = 'diviora.settings.v1';
 const STORAGE_KEY_METADATA = 'diviora.metadata.v1';
 
@@ -76,6 +85,7 @@ const initialState: State = {
   transcripts: [],
   projectSnapshots: [],
   agentPacks: [],
+  dispatchRecords: [],
   settings: defaultSettings,
   metadata: {},
   isLoaded: false,
@@ -171,10 +181,22 @@ function reducer(state: State, action: Action): State {
     case 'SET_AGENT_PACK_STATUS': {
       const next = state.agentPacks.map((pack) => {
         if (pack.pack_id !== action.payload.pack_id) return pack;
+        if (pack.status === 'dispatched' || pack.status === 'rejected' || pack.latest_dispatch_id) return pack;
+
+        const approvalNote = action.payload.approval_note?.trim();
+        if ((action.payload.status === 'approved' || action.payload.status === 'rejected') && !approvalNote) {
+          return pack;
+        }
+
         return {
           ...pack,
           status: action.payload.status,
-          note: action.payload.note,
+          note: approvalNote,
+          approval_note: approvalNote,
+          dispatch_ready_at:
+            action.payload.status === 'approved' && approvalNote
+              ? new Date().toISOString()
+              : pack.dispatch_ready_at,
         };
       });
       localStorage.setItem(STORAGE_KEY_AGENT_PACKS, JSON.stringify({ schema_version: 1, items: next }));
@@ -187,11 +209,64 @@ function reducer(state: State, action: Action): State {
         return {
           ...pack,
           codex_task_packet_markdown: action.payload.codex_task_packet_markdown,
-          status: 'dispatched' as const,
         };
       });
       localStorage.setItem(STORAGE_KEY_AGENT_PACKS, JSON.stringify({ schema_version: 1, items: next }));
       return { ...state, agentPacks: next };
+    }
+
+    case 'ADD_DISPATCH_RECORD': {
+      const nextDispatchRecords = [action.payload, ...state.dispatchRecords];
+      localStorage.setItem(STORAGE_KEY_DISPATCH_RECORDS, JSON.stringify({ schema_version: 1, items: nextDispatchRecords }));
+
+      const nextPacks = state.agentPacks.map((pack) => (
+        pack.pack_id === action.payload.pack_id
+          ? { ...pack, latest_dispatch_id: action.payload.dispatch_id }
+          : pack
+      ));
+      localStorage.setItem(STORAGE_KEY_AGENT_PACKS, JSON.stringify({ schema_version: 1, items: nextPacks }));
+
+      return { ...state, dispatchRecords: nextDispatchRecords, agentPacks: nextPacks };
+    }
+
+    case 'UPDATE_DISPATCH_STATUS': {
+      const now = new Date().toISOString();
+      const nextDispatchRecords = state.dispatchRecords.map((record) => {
+        if (record.dispatch_id !== action.payload.dispatch_id) return record;
+
+        const allowedTransitions: Record<DispatchStatus, DispatchStatus[]> = {
+          queued: ['sent', 'failed', 'canceled'],
+          sent: ['acked', 'failed', 'canceled'],
+          acked: [],
+          failed: [],
+          canceled: [],
+        };
+
+        if (!allowedTransitions[record.status].includes(action.payload.nextStatus)) {
+          return record;
+        }
+
+        const transition = {
+          status: action.payload.nextStatus,
+          at: now,
+          error: action.payload.error,
+        };
+
+        return {
+          ...record,
+          status: action.payload.nextStatus,
+          sent_at: action.payload.nextStatus === 'sent' ? now : record.sent_at,
+          acked_at: action.payload.nextStatus === 'acked' ? now : record.acked_at,
+          failed_at: action.payload.nextStatus === 'failed' ? now : record.failed_at,
+          canceled_at: action.payload.nextStatus === 'canceled' ? now : record.canceled_at,
+          last_error: action.payload.nextStatus === 'failed' ? action.payload.error : record.last_error,
+          attempts: action.payload.nextStatus === 'sent' ? record.attempts + 1 : record.attempts,
+          transitions: [...record.transitions, transition],
+        };
+      });
+
+      localStorage.setItem(STORAGE_KEY_DISPATCH_RECORDS, JSON.stringify({ schema_version: 1, items: nextDispatchRecords }));
+      return { ...state, dispatchRecords: nextDispatchRecords };
     }
 
     case 'UPDATE_SETTINGS': {
@@ -207,13 +282,14 @@ function reducer(state: State, action: Action): State {
     }
 
     case 'REPLACE_STATE': {
-      const { proposals, decisions, runs, transcripts, projectSnapshots, agentPacks, settings, metadata } = action.payload;
+      const { proposals, decisions, runs, transcripts, projectSnapshots, agentPacks, dispatchRecords, settings, metadata } = action.payload;
       localStorage.setItem(STORAGE_KEY_PROPOSALS, JSON.stringify({ schema_version: 1, items: proposals }));
       localStorage.setItem(STORAGE_KEY_DECISIONS, JSON.stringify({ schema_version: 1, items: decisions }));
       localStorage.setItem(STORAGE_KEY_RUNS, JSON.stringify({ schema_version: 1, items: runs }));
       localStorage.setItem(STORAGE_KEY_TRANSCRIPTS, JSON.stringify({ schema_version: 1, items: transcripts }));
       localStorage.setItem(STORAGE_KEY_PROJECT_SNAPSHOTS, JSON.stringify({ schema_version: 1, items: projectSnapshots }));
       localStorage.setItem(STORAGE_KEY_AGENT_PACKS, JSON.stringify({ schema_version: 1, items: agentPacks }));
+      localStorage.setItem(STORAGE_KEY_DISPATCH_RECORDS, JSON.stringify({ schema_version: 1, items: dispatchRecords }));
       localStorage.setItem(STORAGE_KEY_SETTINGS, JSON.stringify(settings));
       localStorage.setItem(STORAGE_KEY_METADATA, JSON.stringify(metadata));
       return { ...action.payload, isLoaded: true };
@@ -226,10 +302,11 @@ function reducer(state: State, action: Action): State {
       localStorage.removeItem(STORAGE_KEY_TRANSCRIPTS);
       localStorage.removeItem(STORAGE_KEY_PROJECT_SNAPSHOTS);
       localStorage.removeItem(STORAGE_KEY_AGENT_PACKS);
+      localStorage.removeItem(STORAGE_KEY_DISPATCH_RECORDS);
       localStorage.removeItem(STORAGE_KEY_SETTINGS);
       localStorage.removeItem(STORAGE_KEY_METADATA);
       localStorage.removeItem('diviora_proposals');
-      return { ...state, proposals: [], decisions: [], runs: [], transcripts: [], projectSnapshots: [], agentPacks: [], settings: defaultSettings, metadata: {} };
+      return { ...state, proposals: [], decisions: [], runs: [], transcripts: [], projectSnapshots: [], agentPacks: [], dispatchRecords: [], settings: defaultSettings, metadata: {} };
     
     default:
       return state;
@@ -245,8 +322,13 @@ const StoreContext = createContext<{
   addProjectSnapshot: (snapshot: ProjectSnapshot) => void;
   deleteProjectSnapshot: (snapshot_id: string) => void;
   addAgentPack: (pack: AgentPack) => void;
-  setAgentPackStatus: (pack_id: string, status: AgentPack['status'], note?: string) => void;
+  setAgentPackStatus: (pack_id: string, status: AgentPack['status'], approval_note?: string) => void;
   setAgentPackCodexTaskPacket: (pack_id: string, codex_task_packet_markdown: string) => void;
+  createDispatch: (pack_id: string, destination: DispatchDestination) => Promise<string>;
+  markDispatchSent: (dispatch_id: string) => void;
+  markDispatchAcked: (dispatch_id: string) => void;
+  markDispatchFailed: (dispatch_id: string, error: string) => void;
+  cancelDispatch: (dispatch_id: string) => void;
   updateSettings: (partial: Partial<Settings>) => void;
   resetAllData: () => void;
   exportSnapshot: () => SnapshotV3;
@@ -266,6 +348,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const savedTranscripts = localStorage.getItem(STORAGE_KEY_TRANSCRIPTS);
       const savedProjectSnapshots = localStorage.getItem(STORAGE_KEY_PROJECT_SNAPSHOTS);
       const savedAgentPacks = localStorage.getItem(STORAGE_KEY_AGENT_PACKS);
+      const savedDispatchRecords = localStorage.getItem(STORAGE_KEY_DISPATCH_RECORDS);
       const savedSettings = localStorage.getItem(STORAGE_KEY_SETTINGS);
       const savedMetadata = localStorage.getItem(STORAGE_KEY_METADATA);
       
@@ -275,6 +358,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       let transcripts: RunTranscript[] = [];
       let projectSnapshots: ProjectSnapshot[] = [];
       let agentPacks: AgentPack[] = [];
+      let dispatchRecords: DispatchRecord[] = [];
       let settings: Settings = defaultSettings;
       let metadata: AppMetadata = {};
 
@@ -358,7 +442,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         } catch (e) { console.error('Failed to parse agent packs:', e); }
       }
 
-      dispatch({ type: 'HYDRATE', proposals, decisions, runs, transcripts, projectSnapshots, agentPacks, settings, metadata });
+      if (savedDispatchRecords) {
+        try {
+          const parsed = JSON.parse(savedDispatchRecords);
+          const result = DispatchRecordsCollectionSchema.safeParse(parsed);
+          if (result.success) {
+            dispatchRecords = result.data.items;
+          }
+        } catch (e) { console.error('Failed to parse dispatch records:', e); }
+      }
+
+      dispatch({ type: 'HYDRATE', proposals, decisions, runs, transcripts, projectSnapshots, agentPacks, dispatchRecords, settings, metadata });
     };
 
     loadData();
@@ -368,10 +462,58 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const addProjectSnapshot = (payload: ProjectSnapshot) => dispatch({ type: 'ADD_PROJECT_SNAPSHOT', payload });
   const deleteProjectSnapshot = (snapshot_id: string) => dispatch({ type: 'DELETE_PROJECT_SNAPSHOT', snapshot_id });
   const addAgentPack = (payload: AgentPack) => dispatch({ type: 'ADD_AGENT_PACK', payload });
-  const setAgentPackStatus = (pack_id: string, status: AgentPack['status'], note?: string) =>
-    dispatch({ type: 'SET_AGENT_PACK_STATUS', payload: { pack_id, status, note } });
+  const setAgentPackStatus = (pack_id: string, status: AgentPack['status'], approval_note?: string) =>
+    dispatch({ type: 'SET_AGENT_PACK_STATUS', payload: { pack_id, status, approval_note } });
   const setAgentPackCodexTaskPacket = (pack_id: string, codex_task_packet_markdown: string) =>
     dispatch({ type: 'SET_AGENT_PACK_CODEX_PACKET', payload: { pack_id, codex_task_packet_markdown } });
+
+
+  const createDispatch = async (pack_id: string, destination: DispatchDestination): Promise<string> => {
+    const pack = state.agentPacks.find((candidate) => candidate.pack_id === pack_id);
+    if (!pack) throw new Error('Pack not found');
+    if (pack.status !== 'approved' || !pack.approval_note?.trim()) {
+      throw new Error('Dispatch requires approved pack with approval note');
+    }
+    if (!pack.codex_task_packet_markdown?.trim()) {
+      throw new Error('Dispatch requires codex task packet payload');
+    }
+
+    const payloadJson = pack.codex_task_packet_markdown;
+    const payloadHash = await sha256Hex(payloadJson);
+    const createdAt = new Date().toISOString();
+    const dispatchId = buildDispatchId(payloadHash, createdAt);
+
+    const record: DispatchRecord = {
+      dispatch_id: dispatchId,
+      created_at: createdAt,
+      pack_id,
+      destination,
+      payload_json: payloadJson,
+      payload_hash: payloadHash,
+      status: 'queued',
+      attempts: 0,
+      transitions: [{ status: 'queued', at: createdAt }],
+    };
+
+    dispatch({ type: 'ADD_DISPATCH_RECORD', payload: record });
+    return dispatchId;
+  };
+
+  const markDispatchSent = (dispatch_id: string) => {
+    dispatch({ type: 'UPDATE_DISPATCH_STATUS', payload: { dispatch_id, nextStatus: 'sent' } });
+  };
+
+  const markDispatchAcked = (dispatch_id: string) => {
+    dispatch({ type: 'UPDATE_DISPATCH_STATUS', payload: { dispatch_id, nextStatus: 'acked' } });
+  };
+
+  const markDispatchFailed = (dispatch_id: string, error: string) => {
+    dispatch({ type: 'UPDATE_DISPATCH_STATUS', payload: { dispatch_id, nextStatus: 'failed', error } });
+  };
+
+  const cancelDispatch = (dispatch_id: string) => {
+    dispatch({ type: 'UPDATE_DISPATCH_STATUS', payload: { dispatch_id, nextStatus: 'canceled' } });
+  };
   const setDecision = (payload: Decision) => {
     const proposal = state.proposals.find(p => p.proposal_id === payload.proposal_id);
     const actionType = payload.status === 'approved' ? 'APPROVE_PROPOSAL' : 'REJECT_PROPOSAL';
@@ -699,6 +841,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           })),
           projectSnapshots: state.projectSnapshots,
           agentPacks: state.agentPacks,
+          dispatchRecords: state.dispatchRecords,
           settings: snapshot.settings,
           metadata: updatedMetadata
         }
@@ -711,7 +854,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <StoreContext.Provider value={{ state, addProposal, setDecision, createRunPlan, generateTranscript, addProjectSnapshot, deleteProjectSnapshot, addAgentPack, setAgentPackStatus, setAgentPackCodexTaskPacket, updateSettings, resetAllData, exportSnapshot, importSnapshot }}>
+    <StoreContext.Provider value={{ state, addProposal, setDecision, createRunPlan, generateTranscript, addProjectSnapshot, deleteProjectSnapshot, addAgentPack, setAgentPackStatus, setAgentPackCodexTaskPacket, createDispatch, markDispatchSent, markDispatchAcked, markDispatchFailed, cancelDispatch, updateSettings, resetAllData, exportSnapshot, importSnapshot }}>
       {children}
     </StoreContext.Provider>
   );

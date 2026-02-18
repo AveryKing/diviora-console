@@ -36,7 +36,7 @@ describe('agent packs store persistence', () => {
 
     const restored = renderHook(() => useStore(), { wrapper });
     await waitFor(() => expect(restored.result.current.state.isLoaded).toBe(true));
-    expect(restored.result.current.state.agentPacks[0].status).toBe('dispatched');
+    expect(restored.result.current.state.agentPacks[0].status).toBe('approved');
     expect(restored.result.current.state.agentPacks[0].note).toBe('ok');
     expect(restored.result.current.state.agentPacks[0].codex_task_packet_markdown).toBe('# CODEX_TASK_PACKET');
   });

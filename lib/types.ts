@@ -229,6 +229,7 @@ export const ProjectSnapshotsCollectionSchema = z.object({
 
 export const AgentPackInputSchema = z.object({
   snapshot_id: z.string().optional(),
+  proposal_id: z.string().optional(),
   selected_goals: z.array(z.string()).optional(),
 });
 
@@ -242,8 +243,19 @@ export const AgentPackSchema = z.object({
   content_markdown: z.string(),
   inputs: AgentPackInputSchema,
   status: z.enum(['draft', 'approved', 'rejected', 'dispatched']),
-  note: z.string().optional(),
+  note: z.string().optional(), // backward compatibility
+  approval_note: z.string().optional(),
+  dispatch_ready_at: z.string().optional(),
+  latest_dispatch_id: z.string().optional(),
   codex_task_packet_markdown: z.string().optional(),
+}).superRefine((pack, ctx) => {
+  if ((pack.status === 'approved' || pack.status === 'rejected') && !pack.approval_note?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'approval_note is required for approved/rejected packs',
+      path: ['approval_note'],
+    });
+  }
 });
 
 export type AgentPack = z.infer<typeof AgentPackSchema>;
@@ -251,6 +263,45 @@ export type AgentPack = z.infer<typeof AgentPackSchema>;
 export const AgentPacksCollectionSchema = z.object({
   schema_version: z.literal(1),
   items: z.array(AgentPackSchema),
+});
+
+
+export const DispatchDestinationSchema = z.enum(['codex_cloud', 'manual_export']);
+export type DispatchDestination = z.infer<typeof DispatchDestinationSchema>;
+
+export const DispatchStatusSchema = z.enum(['queued', 'sent', 'acked', 'failed', 'canceled']);
+export type DispatchStatus = z.infer<typeof DispatchStatusSchema>;
+
+export const DispatchTransitionSchema = z.object({
+  status: DispatchStatusSchema,
+  at: z.string(),
+  error: z.string().optional(),
+});
+
+export type DispatchTransition = z.infer<typeof DispatchTransitionSchema>;
+
+export const DispatchRecordSchema = z.object({
+  dispatch_id: z.string(),
+  created_at: z.string(),
+  pack_id: z.string(),
+  destination: DispatchDestinationSchema,
+  payload_json: z.string(),
+  payload_hash: z.string(),
+  status: DispatchStatusSchema,
+  sent_at: z.string().optional(),
+  acked_at: z.string().optional(),
+  failed_at: z.string().optional(),
+  canceled_at: z.string().optional(),
+  last_error: z.string().optional(),
+  attempts: z.number().int().nonnegative(),
+  transitions: z.array(DispatchTransitionSchema),
+});
+
+export type DispatchRecord = z.infer<typeof DispatchRecordSchema>;
+
+export const DispatchRecordsCollectionSchema = z.object({
+  schema_version: z.literal(1),
+  items: z.array(DispatchRecordSchema),
 });
 
 export const PolicyDecisionSchema = z.object({
